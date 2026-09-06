@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>拼图小游戏</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>🧩 拼图小游戏</h1>
+      <p class="subtitle">支持数字模式与图片模式</p>
+    </header>
+
+    <main>
+      <!-- 控制面板 -->
+      <section class="controls">
+        <div class="row">
+          <label>模式：</label>
+          <div class="seg">
+            <button id="modeNumber" class="seg-btn active">数字</button>
+            <button id="modeImage" class="seg-btn">图片</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <label>难度：</label>
+          <div class="seg">
+            <button class="diff-btn" data-size="3">3×3</button>
+            <button class="diff-btn active" data-size="4">4×4</button>
+            <button class="diff-btn" data-size="5">5×5</button>
+          </div>
+        </div>
+
+        <div class="row image-only" id="imgSrcRow" hidden>
+          <label>图片来源：</label>
+          <div class="seg">
+            <button id="srcDefault" class="seg-btn active">默认风景</button>
+            <button id="srcCustom" class="seg-btn">本地图片</button>
+          </div>
+          <input type="file" id="fileInput" accept="image/*" hidden />
+        </div>
+
+        <div class="row">
+          <button id="shuffleBtn" class="primary">🔀 打乱开始</button>
+          <button id="solveBtn" class="ghost">👁 预览原图</button>
+        </div>
+
+        <div class="stats">
+          <div><span class="stat-label">步数</span><span id="movesEl" class="stat-val">0</span></div>
+          <div><span class="stat-label">用时</span><span id="timeEl" class="stat-val">00:00</span></div>
+          <div><span class="stat-label">最佳步数</span><span id="bestMovesEl" class="stat-val">—</span></div>
+          <div><span class="stat-label">最佳用时</span><span id="bestTimeEl" class="stat-val">—</span></div>
+        </div>
+      </section>
+
+      <!-- 拼图区 -->
+      <section class="board-wrap">
+        <div id="board" class="board" aria-label="拼图棋盘"></div>
+      </section>
+    </main>
+
+    <!-- 完成弹窗 -->
+    <div id="overlay" class="overlay hidden">
+      <div class="modal">
+        <h2>🎉 恭喜完成！</h2>
+        <p id="resultText"></p>
+        <button id="playAgain" class="primary">再来一局</button>
+      </div>
+    </div>
+
+    <footer>
+      <small>点击「打乱开始」后：点击空格旁的方块或使用方向键移动 · 目标是让拼块按顺序归位（空格在右下角）</small>
+    </footer>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

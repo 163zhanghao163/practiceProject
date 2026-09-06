@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>小游戏合集</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    min-height: 100vh;
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+  h1 {
+    font-size: 2.2rem;
+    margin-bottom: 8px;
+    text-shadow: 0 0 12px rgba(0, 229, 255, .6);
+  }
+  p.subtitle { color: #9fb4d0; margin-bottom: 40px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 320px));
+    gap: 24px;
+    width: 100%;
+    max-width: 1080px;
+  }
+  a.card {
+    display: block;
+    text-decoration: none;
+    color: #fff;
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 16px;
+    padding: 28px 24px;
+    transition: transform .2s, box-shadow .2s, border-color .2s;
+  }
+  a.card:hover {
+    transform: translateY(-6px);
+    border-color: #00e5ff;
+    box-shadow: 0 12px 30px rgba(0, 229, 255, .18);
+  }
+  .icon { font-size: 3rem; margin-bottom: 14px; }
+  a.card h2 { font-size: 1.3rem; margin-bottom: 8px; }
+  a.card p { color: #9fb4d0; font-size: .95rem; line-height: 1.5; }
+  .tag {
+    display: inline-block;
+    margin-top: 14px;
+    font-size: .75rem;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(0, 229, 255, .15);
+    color: #7fe9ff;
+  }
+  .tag.new { background: rgba(255, 107, 107, .15); color: #ff9b9b; }
+  footer { margin-top: 50px; color: #5a6b85; font-size: .85rem; }
+  @media (max-width: 480px) {
+    body { padding: 24px 12px; }
+    h1 { font-size: 1.6rem; }
+    p.subtitle { margin-bottom: 24px; }
+    a.card { padding: 20px 18px; }
+  }
+</style>
+</head>
+<body>
+  <h1>🎮 小游戏 & 工具合集</h1>
+  <p class="subtitle">选择一个开始</p>
+  <div class="grid">
+    <a class="card" href="./puzzle-game/index.html">
+      <div class="icon">🧩</div>
+      <h2>拼图小游戏</h2>
+      <p>经典拼图玩法，把打乱的碎块还原成完整图片。</p>
+      <span class="tag">已有游戏</span>
+    </a>
+    <a class="card" href="./drag-puzzle-game/index.html">
+      <div class="icon">🖱️</div>
+      <h2>拖拽拼图</h2>
+      <p>拖拽碎块交换位置，考验观察力与耐心。</p>
+      <span class="tag">已有游戏</span>
+    </a>
+    <a class="card" href="./pixel-adventure/index.html">
+      <div class="icon">🕹️</div>
+      <h2>像素大冒险</h2>
+      <p>像素风横版闯关：跳跃、躲避、收集金币，闯过所有关卡！</p>
+      <span class="tag new">新游戏</span>
+    </a>
+    <a class="card" href="./roguelike-arena/index.html">
+      <div class="icon">⚔️</div>
+      <h2>像素勇者 · 怪物围城</h2>
+      <p>肉鸽割草：杀穿怪潮，升级三选一天赋，每 2 分钟一局精英，坚持 8 分钟获胜！</p>
+      <span class="tag new">新游戏</span>
+    </a>
+    <a class="card" href="./token-usage-tracker/index.html">
+      <div class="icon">📊</div>
+      <h2>Token 用量统计</h2>
+      <p>统计 Trae / Codex / Claude / DeepSeek 等工具的 token 用量与费用，支持导入导出。</p>
+      <span class="tag" style="background:rgba(122,255,138,.15);color:#9dffb0">工具</span>
+    </a>
+  </div>
+  <footer>纯前端小游戏 · 无需安装，点击即玩</footer>
+</body>
+</html>

@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>像素大冒险</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { overscroll-behavior: none; }
+  body {
+    background: #0d0d1a;
+    color: #fff;
+    font-family: "Courier New", monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    min-height: 100svh;
+    padding: 16px;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 10px; letter-spacing: 2px; text-shadow: 2px 2px #ff0066; }
+  /* 画布自适应：不超屏宽，也不超可视高度（130px 留给标题+说明） */
+  #wrap {
+    position: relative;
+    width: min(96vw, 960px, calc((100vh - 130px) * 16 / 9));
+    width: min(96vw, 960px, calc((100svh - 130px) * 16 / 9));
+  }
+  canvas {
+    display: block;
+    width: 100%; height: auto; aspect-ratio: 16 / 9;
+    background: #5c94fc;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border: 4px solid #222;
+    box-shadow: 0 0 0 4px #444, 0 12px 40px rgba(0,0,0,.6);
+    touch-action: none;
+  }
+  #hint { margin-top: 12px; color: #8a8fb0; font-size: .85rem; text-align: center; line-height: 1.6; max-width: 980px; }
+  kbd {
+    background: #22243a; border: 1px solid #4a4e6e; border-bottom-width: 3px;
+    border-radius: 4px; padding: 1px 7px; color: #cfd3ff; font-family: inherit;
+  }
+  /* 触屏虚拟按键：仅触控设备显示 */
+  #touch { display: none; }
+  @media (pointer: coarse) {
+    body { padding-bottom: 110px; }
+    #touch {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      position: fixed; left: 0; right: 0; bottom: 14px; padding: 0 16px;
+      z-index: 5; pointer-events: none;
+    }
+    #touch .grp { display: flex; gap: 12px; pointer-events: auto; }
+    #touch button {
+      width: 64px; height: 64px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.45); background: rgba(30,30,60,.5);
+      color: #fff; font-size: 1.5rem; font-family: inherit;
+      touch-action: none; user-select: none; -webkit-user-select: none;
+    }
+    #touch button:active { background: rgba(255,255,255,.28); }
+    #touch #t-jump { width: 84px; height: 84px; font-size: 1.15rem; border-color: #ffce54; color: #ffce54; }
+    #touch #t-restart { width: 46px; height: 46px; font-size: 1rem; align-self: flex-start; }
+  }
+  /* 横屏矮窗口（手机横过来玩）：隐藏标题说明，画布占满 */
+  @media (max-height: 520px) {
+    h1, #hint { display: none; }
+    body { padding: 6px; }
+    #wrap {
+      width: min(98vw, 960px, calc((100vh - 20px) * 16 / 9));
+      width: min(98vw, 960px, calc((100svh - 20px) * 16 / 9));
+    }
+  }
+</style>
+</head>
+<body>
+  <h1>像素大冒险</h1>
+  <div id="wrap"><canvas id="game" width="960" height="540"></canvas></div>
+  <div id="touch">
+    <div class="grp"><button id="t-left" aria-label="向左">◀</button><button id="t-right" aria-label="向右">▶</button></div>
+    <div class="grp"><button id="t-restart" aria-label="重开本关">↻</button><button id="t-jump">跳</button></div>
+  </div>
+  <p id="hint">
+    <kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd> 移动 &nbsp;·&nbsp;
+    <kbd>空格</kbd> / <kbd>↑</kbd> / <kbd>W</kbd> 跳跃 &nbsp;·&nbsp; <kbd>R</kbd> 重开本关<br />
+    触屏设备：屏幕下方有虚拟按键，点「跳」也可开始游戏<br />
+    红色<b>弹跳板</b>可弹上高空 · 站上<b>移动平台</b>会载你过岩浆 · <b>蝙蝠</b>会飞但也能踩 ·
+    第 3 关终点旗需要集齐金币解锁！
+  </p>
+<script>
+(function () {
+  "use strict";
+  const TILE = 40, VIEW_W = 960, VIEW_H = 540;
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+
+  // 图例: . 空气  # 地面  B 砖块  ? 问号砖  o 金币  ^ 尖刺  ~ 熔岩
+  //       P 出生点  E 行走敌人  G 飞行蝙蝠  F 终点旗  | 平台
+  //       J 弹跳板  M 水平移动平台(2格宽)  V 垂直移动平台(2格宽)
+  const LEVELS = [
+    {
+      name: "第 1 关 · 绿野草原",
+      sky: "#5c94fc", ground: "#3aa832", dirt: "#7a4a21", brick: "#c86428",
+      map: [
+        "....................................................................................................",
+        "....................................................................................................",
+        "....................................................................................................",
+        "....................................................................................................",
+        "....................................................................................................",
+        ".................................o.o................................................................",
+        "....................................................................................................",
+        "..........................o.o.......................................o.o.............................",
+        "..........................|||.................B?B...................|||.............................",
+        "....................................................................................................",
+        "...P......o.o.o.........E.........J.................E...^^................E.............o.o.....F...",
+        "##################...##################...##################...##################...################",
+        "##################...##################...##################...##################...################",
+      ]
+    },
+    {
+      name: "第 2 关 · 幽暗洞窟",
+      sky: "#1a1230", ground: "#5a5a72", dirt: "#3c3c50", brick: "#8a5aa0",
+      map: [
+        "..............................................................................................................",
+        "..............................................................................................................",
+        "..............................................................................................................",
+        ".......................................................o.o....................................................",
+        "..............................................................................................................",
+        "..............................................................................................................",
+        "........................................................V.....................................................",
+        "...................G.......................G......o.o..............G..........................................",
+        "..............................B?B.................|||................................................B?B......",
+        "................M........................M.......................M............................................",
+        "...P...............................^^.....................^^E.............E.....^^.o.o.......E....^^....o.oF..",
+        "#############~~~~~~~~~~################~~~~~~~~################~~~~~~~~###############~~~#####################",
+        "#############~~~~~~~~~~################~~~~~~~~################~~~~~~~~###############~~~#####################",
+      ]
+    },
+    {
+      name: "第 3 关 · 熔岩要塞",
+      sky: "#2b0f14", ground: "#6e3038", dirt: "#471e24", brick: "#b05030",
+      coinGate: 8,
+      map: [
+        "........................................................................................................................",
+        "........................................................................................................................",
+        "........................................................................................................................",
+        "......................................................o.o...............................................................",
+        "........................................................................................................................",
+        "...............................o.o.................................................................o.o..................",
+        ".......................................................V................................................................",
+        "................G.......................G........o.o...........G......................G.................................",
+        "........................B?B......................|||....................G.....B?B.......................................",
+        ".............M.......................M.......................M.....................M....................................",
+        "...P..................E......^^.J.............E.........o.o..........E.....^^..............E...^^...J.o.o......E.o.o.F..",
+        "###########~~~~~~~~################~~~~~~~~################~~~~~~~###############~~~~~~~#################~~~############",
+        "###########~~~~~~~~################~~~~~~~~################~~~~~~~###############~~~~~~~#################~~~############",
+      ]
+    }
+  ];
+
+  const GRAV = 0.5, MOVE = 0.55, MAX_SPD = 3.6, JUMP = -13.0, SPRING_V = -18, FRICTION = 0.8;
+
+  let levelIdx = 0, lives = 3, score = 0, state = "title";
+  let player, enemies, coins, spikes, solids, lava, movers, flag, msgTimer = 0, msgText = "", clearTimer = 0;
+  let levelCoinsGot = 0, flagLocked = false;
+  const keys = {};
+  let camX = 0, tick = 0;
+
+  // 熔岩要塞的上升火星（背景氛围粒子）
+  const embers = Array.from({ length: 45 }, (_, i) => ({
+    x: (i * 137) % VIEW_W, y: (i * 211) % VIEW_H, s: 0.4 + (i % 7) * 0.12, ph: i
+  }));
+
+  function tryStart() {
+    if (state !== "title" && state !== "gameover" && state !== "win") return;
+    if (state === "win") { levelIdx = 0; lives = 3; score = 0; }
+    loadLevel(levelIdx);
+    state = "play";
+  }
+  document.addEventListener("keydown", e => {
+    if (["ArrowLeft","ArrowRight","ArrowUp"," ","Spacebar"].includes(e.key)) e.preventDefault();
+    keys[e.key.toLowerCase()] = true;
+    if (e.key === " " || e.key === "Spacebar") keys["space"] = true;
+    if (e.key.toLowerCase() === "r" && state === "play") loadLevel(levelIdx);
+    if (e.key === "Enter" || e.key === " ") tryStart();
+  });
+  document.addEventListener("keyup", e => {
+    keys[e.key.toLowerCase()] = false;
+    if (e.key === " " || e.key === "Spacebar") keys["space"] = false;
+  });
+
+  // ---------- 触屏虚拟按键 ----------
+  function bindTouchBtn(id, down, up) {
+    const el = document.getElementById(id);
+    el.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (err) { /* 合成事件无真实指针，忽略 */ }
+      down();
+    });
+    const off = e => { e.preventDefault(); up(); };
+    el.addEventListener("pointerup", off);
+    el.addEventListener("pointercancel", off);
+    el.addEventListener("contextmenu", e => e.preventDefault());
+  }
+  bindTouchBtn("t-left",  () => { keys["arrowleft"] = true; },  () => { keys["arrowleft"] = false; });
+  bindTouchBtn("t-right", () => { keys["arrowright"] = true; }, () => { keys["arrowright"] = false; });
+  bindTouchBtn("t-jump",  () => { keys["space"] = true; tryStart(); }, () => { keys["space"] = false; });
+  bindTouchBtn("t-restart", () => { if (state === "play") loadLevel(levelIdx); else tryStart(); }, () => {});
+  canvas.addEventListener("pointerdown", e => { e.preventDefault(); tryStart(); });
+
+  function loadLevel(idx) {
+    const L = LEVELS[idx];
+    enemies = []; coins = []; spikes = []; solids = []; lava = []; movers = []; flag = null;
+    levelCoinsGot = 0;
+    const map = L.map;
+    for (let r = 0; r < map.length; r++) {
+      for (let c = 0; c < map[r].length; c++) {
+        const ch = map[r][c], x = c * TILE, y = r * TILE;
+        if (ch === "#") solids.push({ x, y, w: TILE, h: TILE, t: "ground" });
+        else if (ch === "B" || ch === "?") solids.push({ x, y, w: TILE, h: TILE, t: ch === "?" ? "q" : "brick", used: false });
+        else if (ch === "|") solids.push({ x, y, w: TILE, h: TILE/2, t: "plat" });
+        else if (ch === "J") solids.push({ x, y, w: TILE, h: TILE, t: "spring", squash: 0 });
+        else if (ch === "o") coins.push({ x: x + TILE/2, y: y + TILE/2, taken: false });
+        else if (ch === "^") spikes.push({ x: x + 4, y: y + TILE - 14, w: TILE - 8, h: 14 });
+        else if (ch === "~") lava.push({ x, y, w: TILE, h: TILE });
+        else if (ch === "P") player = { x: x + 4, y: y, w: 26, h: 34, vx: 0, vy: 0, onGround: false, face: 1, inv: 60, coyote: 0, jbuf: 0, prevJump: false, onMover: null };
+        else if (ch === "E") enemies.push({ x, y: y + 8, w: 30, h: 28, vx: 0.8, dead: 0 });
+        else if (ch === "G") enemies.push({ x, y, w: 30, h: 24, ox: x, oy: y, phase: c * 0.7, t: 0, vx: 0, dead: 0, fly: true });
+        else if (ch === "M") movers.push({ x, y: y + 12, w: TILE * 2, h: 16, ox: x, oy: y + 12, axis: "x", range: 90, speed: 0.022, phase: c, dx: 0, dy: 0 });
+        else if (ch === "V") movers.push({ x, y: y + 12, w: TILE * 2, h: 16, ox: x, oy: y + 12, axis: "y", range: 80, speed: 0.03, phase: c, dx: 0, dy: 0 });
+        else if (ch === "F") flag = { x: x + TILE/2, y: y + TILE };
+      }
+    }
+    flagLocked = !!L.coinGate;
+    camX = 0;
+  }
+
+  function setMsg(t, f) { msgText = t; msgTimer = f; }
+
+  function collideSolids(e, dx, dy) {
+    e.x += dx;
+    for (const s of solids) {
+      if (s.t === "plat") continue;
+      if (hit(e, s)) { if (dx > 0) e.x = s.x - e.w; else if (dx < 0) e.x = s.x + s.w; e.vx = 0; }
+    }
+    e.y += dy;
+    e.onGround = false;
+    for (const s of solids) {
+      if (!hit(e, s)) continue;
+      if (s.t === "plat") {
+        if (dy > 0 && e.y + e.h - dy <= s.y + 6) { e.y = s.y - e.h; e.vy = 0; e.onGround = true; }
+        continue;
+      }
+      if (dy > 0) {
+        e.y = s.y - e.h; e.vy = 0; e.onGround = true;
+        if (e === player) {
+          if (s.t === "spring") { e.vy = SPRING_V; e.onGround = false; s.squash = 14; }
+          else bump(s);
+        }
+      } else if (dy < 0) { e.y = s.y + s.h; e.vy = 0; if (e === player) bump(s); }
+    }
+  }
+  function hit(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+  function bump(s) {
+    if (s.t === "q" && !s.used) {
+      s.used = true; score += 100;
+      coins.push({ x: s.x + TILE/2, y: s.y - TILE/2, taken: false, pop: 30 });
+    }
+  }
+
+  function update() {
+    tick++;
+    if (msgTimer > 0) msgTimer--;
+    if (state === "clear") {
+      clearTimer--;
+      if (clearTimer <= 0) {
+        if (levelIdx < LEVELS.length - 1) { levelIdx++; loadLevel(levelIdx); state = "play"; }
+        else state = "win";
+      }
+      return;
+    }
+    if (state !== "play") return;
+
+    const L = LEVELS[levelIdx], mapW = L.map[0].length * TILE;
+
+    // 1) 移动平台先走，记录本帧位移
+    for (const m of movers) {
+      const px_ = m.x, py_ = m.y;
+      const off = Math.sin(tick * m.speed + m.phase) * m.range;
+      if (m.axis === "x") { m.x = m.ox + off; m.y = m.oy; }
+      else { m.x = m.ox; m.y = m.oy + off; }
+      m.dx = m.x - px_; m.dy = m.y - py_;
+    }
+
+    // 2) 玩家物理
+    const p = player;
+    const left = keys["arrowleft"] || keys["a"], right = keys["arrowright"] || keys["d"];
+    if (left) { p.vx -= MOVE; p.face = -1; }
+    if (right) { p.vx += MOVE; p.face = 1; }
+    if (!left && !right && p.onGround) p.vx *= FRICTION;
+    if (Math.abs(p.vx) < 0.05) p.vx = 0;
+    p.vx = Math.max(-MAX_SPD, Math.min(MAX_SPD, p.vx));
+    if (p.onGround) p.coyote = 7; else if (p.coyote > 0) p.coyote--;
+    const wantJump = keys["space"] || keys["arrowup"] || keys["w"];
+    if (wantJump && !p.prevJump) p.jbuf = 8;
+    p.prevJump = wantJump;
+    if (p.jbuf > 0) p.jbuf--;
+    if (p.jbuf > 0 && p.coyote > 0) { p.vy = JUMP; p.coyote = 0; p.jbuf = 0; p.onGround = false; }
+    if (!wantJump && p.vy < -4.5) p.vy = -4.5;
+    p.vy = Math.min(p.vy + GRAV, 14);
+    collideSolids(p, p.vx, p.vy);
+
+    // 3) 移动平台载客：落上即吸附，并随平台移动
+    p.onMover = null;
+    for (const m of movers) {
+      const bottom = p.y + p.h;
+      if (p.x + p.w > m.x && p.x < m.x + m.w && p.vy >= 0 && bottom >= m.y && bottom <= m.y + m.h + 10) {
+        p.y = m.y - p.h; p.vy = 0; p.onGround = true; p.onMover = m;
+      }
+    }
+    if (p.onMover) p.x += p.onMover.dx;
+    p.x = Math.max(0, Math.min(p.x, mapW - p.w));
+    if (p.inv > 0) p.inv--;
+
+    // 掉落 / 熔岩 / 尖刺
+    if (p.y > VIEW_H + 100 || lava.some(l => hit(p, l)) || spikes.some(s => hit(p, s) && p.vy > -2)) hurt();
+
+    // 金币
+    for (const c of coins) {
+      if (c.taken) continue;
+      if (c.pop) { c.pop--; c.y -= 1.5; if (c.pop === 0) c.taken = true; continue; }
+      if (Math.abs(p.x + p.w/2 - c.x) < 30 && Math.abs(p.y + p.h/2 - c.y) < 34) {
+        c.taken = true; score += 50; levelCoinsGot++;
+        if (flagLocked && levelCoinsGot >= L.coinGate) { flagLocked = false; setMsg("🔑 终点旗已解锁！", 90); }
+      }
+    }
+
+    // 敌人（行走 + 飞行）
+    for (const en of enemies) {
+      if (en.dead) { en.dead++; continue; }
+      if (en.fly) {
+        en.t++;
+        en.x = en.ox + Math.sin(en.t * 0.02 + en.phase) * 70;
+        en.y = en.oy + Math.sin(en.t * 0.033 + en.phase * 2) * 24;
+      } else {
+        en.vy = Math.min((en.vy || 0) + GRAV, 12);
+        const ox = en.x;
+        collideSolids(en, en.vx, en.vy);
+        if (en.x < 0) { en.x = 0; en.vx = Math.abs(en.vx); }
+        if (en.x > mapW - en.w) { en.x = mapW - en.w; en.vx = -Math.abs(en.vx); }
+        if (en.x === ox) en.vx *= -1;
+        if (en.y > VIEW_H + 80) en.dead = 1;
+      }
+      if (p.inv === 0 && hit(p, en)) {
+        if (p.vy > 1.5 && p.y + p.h < en.y + en.h * 0.7) { en.dead = 1; p.vy = JUMP * 0.7; score += 200; }
+        else hurt();
+      }
+    }
+
+    // 终点旗（第 3 关需金币解锁）
+    if (flag && Math.abs(p.x + p.w/2 - flag.x) < 30 && p.y + p.h > flag.y - TILE * 2) {
+      if (flagLocked) {
+        if (msgTimer <= 0) setMsg(`🔒 还需 ${L.coinGate - levelCoinsGot} 枚金币解锁终点旗`, 60);
+      } else {
+        score += 500;
+        state = "clear"; clearTimer = 100;
+      }
+    }
+
+    camX += ((p.x - VIEW_W * 0.4) - camX) * 0.12;
+    camX = Math.max(0, Math.min(camX, mapW - VIEW_W));
+  }
+
+  function hurt() {
+    if (player.inv > 0) return;
+    lives--;
+    if (lives <= 0) { state = "gameover"; return; }
+    loadLevel(levelIdx);
+  }
+
+  // ---- 绘制 ----
+  function px(x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
+  function shade(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = Math.max(0, Math.min(255, (n >> 16) + amt));
+    const g = Math.max(0, Math.min(255, ((n >> 8) & 255) + amt));
+    const b = Math.max(0, Math.min(255, (n & 255) + amt));
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function drawBackground(L) {
+    px(0, 0, VIEW_W, VIEW_H, L.sky);
+    if (levelIdx === 0) {
+      for (let i = 0; i < 5; i++) {
+        const cx = (i * 260 - camX * 0.4) % (VIEW_W + 160) - 80;
+        px(cx + 20, 60 + i * 18, 40, 12, "#ffffff");
+        px(cx + 34, 48 + i * 18, 30, 14, "#ffffff");
+      }
+    } else if (levelIdx === 1) {
+      for (let i = 0; i < 40; i++) {
+        const sx = (i * 137 + 40 - camX * 0.3) % VIEW_W, sy = (i * 89) % 260;
+        px(sx, sy, 2, 2, "rgba(255,255,255,.6)");
+      }
+      for (let i = 0; i < 7; i++) {                     // 洞窟钟乳石
+        const sx = (i * 170 + 60 - camX * 0.5) % (VIEW_W + 200) - 100;
+        const h = 50 + (i % 3) * 34;
+        ctx.fillStyle = "#120c22";
+        ctx.beginPath();
+        ctx.moveTo(sx, 0); ctx.lineTo(sx + 26, 0); ctx.lineTo(sx + 13, h);
+        ctx.fill();
+      }
+    } else {
+      for (const em of embers) {                        // 熔岩火星上升
+        em.y -= em.s;
+        em.x += Math.sin(tick * 0.03 + em.ph) * 0.4;
+        if (em.y < -4) { em.y = VIEW_H + 4; em.x = (em.x + 311) % VIEW_W; }
+        px(em.x, em.y, 3, 3, em.s > 0.9 ? "#ff9a3d" : "#e8542a");
+      }
+    }
+  }
+
+  function drawPlayer(p) {
+    if (p.inv > 0 && (tick >> 2) % 2) return;
+    const x = Math.round(p.x), y = Math.round(p.y), f = p.face;
+    px(x + 4, y, 18, 6, "#e02020");
+    px(x + (f>0?14:4), y + 2, 8, 4, "#e02020");
+    px(x + 6, y + 6, 14, 10, "#ffcc99");
+    px(x + (f>0?14:8), y + 8, 3, 3, "#222");
+    px(x + 4, y + 16, 18, 10, "#2255cc");
+    const step = p.onGround && Math.abs(p.vx) > 0.4 ? (tick >> 3) % 2 : 0;
+    px(x + 4 + step * 4, y + 26, 7, 8, "#5a3a1a");
+    px(x + 15 - step * 4, y + 26, 7, 8, "#5a3a1a");
+  }
+
+  function drawEnemy(en) {
+    if (en.dead) return;
+    const x = Math.round(en.x), y = Math.round(en.y);
+    if (en.fly) {
+      const f = Math.sin(tick * 0.25 + en.phase) * 5;
+      px(x + 10, y + 6, 12, 12, "#7a3fa0");
+      px(x + 12, y + 1, 8, 6, "#7a3fa0");
+      px(x + 12, y - 2, 3, 4, "#5a2a78"); px(x + 17, y - 2, 3, 4, "#5a2a78");
+      px(x + 13, y + 8, 3, 3, "#ffe98a"); px(x + 17, y + 8, 3, 3, "#ffe98a");
+      px(x, y + 4 + f, 10, 6, "#5a2a78"); px(x + 22, y + 4 - f, 10, 6, "#5a2a78");
+    } else {
+      const wob = (tick >> 4) % 2;
+      px(x + 2, y, 26, 18, "#8a4a2a");
+      px(x + 4, y - 4 + wob, 22, 6, "#a85a30");
+      px(x + 6, y + 4, 5, 5, "#fff"); px(x + 17, y + 4, 5, 5, "#fff");
+      px(x + 7, y + 5, 3, 3, "#111"); px(x + 18, y + 5, 3, 3, "#111");
+      px(x + 3, y + 18 + wob * 2, 8, 6, "#5a2a12");
+      px(x + 19, y + 18 - wob * 2 + 2, 8, 6, "#5a2a12");
+    }
+  }
+
+  function draw() {
+    const L = LEVELS[levelIdx];
+    drawBackground(L);
+    ctx.save();
+    ctx.translate(-Math.round(camX), 0);
+
+    for (const m of movers) {
+      if (m.x + m.w < camX - 60 || m.x > camX + VIEW_W + 60) continue;
+      px(m.x, m.y, m.w, m.h, "#9aa4c0");
+      px(m.x, m.y, m.w, 4, "#d0d8ee");
+      px(m.x + 4, m.y + m.h - 6, 4, 4, "#5a6078"); px(m.x + m.w - 8, m.y + m.h - 6, 4, 4, "#5a6078");
+    }
+
+    for (const s of solids) {
+      if (s.x + s.w < camX - 60 || s.x > camX + VIEW_W + 60) continue;
+      if (s.t === "ground") {
+        px(s.x, s.y, s.w, s.h, L.ground);
+        px(s.x, s.y, s.w, 6, L.ground === "#5a5a72" ? "#7a7a92" : shade(L.ground, 40));
+        px(s.x + 2, s.y + 8, 8, 6, L.dirt);
+        px(s.x + 22, s.y + 22, 8, 6, L.dirt);
+      } else if (s.t === "plat") {
+        px(s.x, s.y, s.w, s.h, L.brick);
+        px(s.x, s.y, s.w, 3, shade(L.brick, 50));
+      } else if (s.t === "q") {
+        px(s.x, s.y, s.w, s.h, s.used ? "#7a6a3a" : "#e8b820");
+        px(s.x + 3, s.y + 3, s.w - 6, s.h - 6, s.used ? "#5a4a2a" : "#f8d860");
+        if (!s.used) { px(s.x + 16, s.y + 8, 8, 4, "#8a5a00"); px(s.x + 20, s.y + 10, 4, 8, "#8a5a00"); px(s.x + 16, s.y + 20, 8, 4, "#8a5a00"); px(s.x + 15, s.y + 24, 4, 4, "#8a5a00"); px(s.x + 21, s.y + 24, 4, 4, "#8a5a00"); }
+      } else if (s.t === "spring") {
+        const sq = s.squash > 0 ? 8 : 0;
+        if (s.squash > 0) s.squash--;
+        px(s.x + 2, s.y + 32, 36, 8, "#444");
+        px(s.x + 10, y8(s, 16) + sq, 20, 5, "#d03030");
+        px(s.x + 10, y8(s, 22) + sq * 0.5, 20, 5, "#d03030");
+        px(s.x + 10, y8(s, 28) + sq * 0.25, 20, 5, "#d03030");
+        px(s.x + 4, s.y + 8 + sq, 32, 6, "#f0f0f0");
+      } else {
+        px(s.x, s.y, s.w, s.h, L.brick);
+        px(s.x, s.y, s.w, 3, shade(L.brick, 50));
+        px(s.x + 1, s.y + 20, s.w - 2, 2, shade(L.brick, -40));
+      }
+    }
+    for (const s of spikes) {
+      for (let i = 0; i < 3; i++) {
+        const bx = s.x + i * (s.w / 3);
+        ctx.fillStyle = "#cfd4e0";
+        ctx.beginPath();
+        ctx.moveTo(bx, s.y + s.h); ctx.lineTo(bx + s.w / 6, s.y); ctx.lineTo(bx + s.w / 3, s.y + s.h);
+        ctx.fill();
+      }
+    }
+    for (const c of coins) {
+      if (c.taken) continue;
+      const spin = Math.abs(Math.cos(tick * 0.08)) * 10 + 4;
+      px(c.x - spin/2, c.y - 9, spin, 18, "#ffd700");
+      px(c.x - spin/2 + 2, c.y - 7, Math.max(2, spin - 4), 14, "#ffe98a");
+    }
+    for (const en of enemies) drawEnemy(en);
+    if (flag) {
+      const fy = flag.y;
+      px(flag.x - 3, fy - TILE * 2.6, 6, TILE * 2.6, flagLocked ? "#6a6a7a" : "#c8c8c8");
+      const wave = Math.sin(tick * 0.1) * 3;
+      ctx.fillStyle = flagLocked ? "#7a7a8a" : "#30d040";
+      ctx.beginPath();
+      ctx.moveTo(flag.x + 3, fy - TILE * 2.6);
+      ctx.lineTo(flag.x + 40 + wave, fy - TILE * 2.2);
+      ctx.lineTo(flag.x + 3, fy - TILE * 1.8);
+      ctx.fill();
+      if (flagLocked) {                              // 锁
+        px(flag.x - 9, fy - 74, 18, 13, "#e8b820");
+        ctx.strokeStyle = "#e8b820"; ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(flag.x, fy - 74, 6, Math.PI, 0);
+        ctx.stroke();
+      }
+    }
+    drawPlayer(player);
+    ctx.restore();
+
+    drawHud();
+    if (state !== "play") overlay();
+  }
+  function y8(s, v) { return s.y + v; }
+
+  function drawHud() {
+    const L = LEVELS[levelIdx];
+    ctx.font = "bold 18px 'Courier New', monospace";
+    ctx.strokeStyle = "rgba(0,0,0,.6)";
+    ctx.lineWidth = 4;
+    let text = `❤ × ${lives}    🪙 ${score}    ${L.name}`;
+    if (L.coinGate) text += `    🔑 ${levelCoinsGot}/${L.coinGate}`;
+    ctx.strokeText(text, 16, 30);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(text, 16, 30);
+    if (msgTimer > 0 && msgText) {
+      ctx.fillStyle = `rgba(255,255,255,${Math.min(1, msgTimer / 30)})`;
+      ctx.textAlign = "center";
+      ctx.fillText(msgText, VIEW_W / 2, 70);
+      ctx.textAlign = "left";
+    }
+  }
+
+  function overlay() {
+    if (state === "clear") {
+      ctx.fillStyle = "rgba(8,8,20,.45)";
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      ctx.textAlign = "center";
+      ctx.font = "bold 40px 'Courier New', monospace";
+      ctx.fillStyle = "#ffe98a";
+      ctx.fillText(`🎉 ${LEVELS[levelIdx].name} 完成！ +500`, VIEW_W / 2, VIEW_H / 2 - 10);
+      ctx.font = "20px 'Courier New', monospace";
+      ctx.fillStyle = "#fff";
+      ctx.fillText(levelIdx < LEVELS.length - 1 ? "准备进入下一关…" : "全部关卡完成！", VIEW_W / 2, VIEW_H / 2 + 34);
+      ctx.textAlign = "left";
+      return;
+    }
+    ctx.fillStyle = "rgba(8,8,20,.78)";
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.textAlign = "center";
+    ctx.font = "bold 44px 'Courier New', monospace";
+    ctx.fillStyle = state === "win" ? "#7fff7f" : state === "gameover" ? "#ff6b6b" : "#ffe98a";
+    const t = state === "win" ? "🏆 通关成功！" : state === "gameover" ? "💀 游戏结束" : "像素大冒险";
+    ctx.fillText(t, VIEW_W / 2, VIEW_H / 2 - 40);
+    ctx.font = "20px 'Courier New', monospace";
+    ctx.fillStyle = "#fff";
+    const sub = state === "title"
+      ? "草原 → 洞窟 → 要塞：弹跳板、移动平台、蝙蝠、金币锁"
+      : state === "win" ? `最终得分：${score}` : `得分：${score} · 剩余生命耗尽`;
+    ctx.fillText(sub, VIEW_W / 2, VIEW_H / 2 + 10);
+    const blink = (tick >> 5) % 2;
+    if (blink) {
+      ctx.fillStyle = "#ffe98a";
+      ctx.fillText(state === "title" ? "按 空格 / 回车 开始游戏" : "按 空格 / 回车 重新开始", VIEW_W / 2, VIEW_H / 2 + 56);
+    }
+    ctx.textAlign = "left";
+  }
+
+  function loop() { update(); draw(); requestAnimationFrame(loop); }
+  loadLevel(0);
+  loop();
+})();
+</script>
+</body>
+</html>

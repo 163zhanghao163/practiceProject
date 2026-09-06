@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>拖拽拼图</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>🧩 拖拽拼图</h1>
+      <p class="subtitle">把拼块拖进棋盘，还原完整图片 —— 支持 6 档难度</p>
+    </header>
+
+    <main>
+      <!-- 控制面板 -->
+      <section class="controls">
+        <div class="row">
+          <label>难度</label>
+          <div class="seg diff-group" id="diffGroup">
+            <button class="diff-btn" data-size="3"><strong>3×3</strong><small>简单</small></button>
+            <button class="diff-btn active" data-size="4"><strong>4×4</strong><small>入门</small></button>
+            <button class="diff-btn" data-size="5"><strong>5×5</strong><small>进阶</small></button>
+            <button class="diff-btn" data-size="6"><strong>6×6</strong><small>困难</small></button>
+            <button class="diff-btn" data-size="7"><strong>7×7</strong><small>专家</small></button>
+            <button class="diff-btn" data-size="8"><strong>8×8</strong><small>大师</small></button>
+          </div>
+        </div>
+
+        <div class="row" id="imgSrcRow">
+          <label>图片来源</label>
+          <div class="seg">
+            <button class="seg-btn active" id="srcDefault">默认风景</button>
+            <button class="seg-btn" id="srcCustom">本地图片</button>
+          </div>
+          <input type="file" id="fileInput" accept="image/*" hidden />
+        </div>
+
+        <div class="row actions-row">
+          <button class="primary" id="shuffleBtn">🔀 重新打乱</button>
+          <button class="ghost" id="previewBtn">🖼️ 预览原图</button>
+          <button class="ghost" id="hintBtn" aria-pressed="false">💡 底图提示</button>
+        </div>
+      </section>
+
+      <!-- 统计 -->
+      <section class="stats">
+        <div><span class="stat-label">步数</span><span class="stat-val" id="movesEl">0</span></div>
+        <div><span class="stat-label">用时</span><span class="stat-val" id="timeEl">00:00</span></div>
+        <div><span class="stat-label">进度</span><span class="stat-val" id="progEl">0 / 16</span></div>
+        <div><span class="stat-label">最佳步数</span><span class="stat-val" id="bestMovesEl">—</span></div>
+        <div><span class="stat-label">最佳时间</span><span class="stat-val" id="bestTimeEl">—</span></div>
+      </section>
+
+      <!-- 游戏区：左棋盘 + 右拼块区 -->
+      <section class="play-field">
+        <div class="board-panel">
+          <div class="board-frame" id="boardFrame">
+            <div id="hintLayer"></div>
+            <div id="board" class="board" aria-label="拼图棋盘"></div>
+          </div>
+          <small class="panel-caption">把拼块拖到这里 · 放到已有拼块的格子上会交换</small>
+        </div>
+
+        <div class="tray-panel">
+          <div class="panel-head"><span>拼块区</span><span id="trayCount">16</span></div>
+          <div id="tray" class="tray"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 胜利弹窗 -->
+    <div id="winOverlay" class="overlay hidden">
+      <div class="modal">
+        <h2>🎉 恭喜完成！</h2>
+        <p id="resultText">用时 00:00，共 0 步。</p>
+        <button class="primary" id="playAgain">再来一局</button>
+      </div>
+    </div>
+
+    <!-- 原图预览弹窗 -->
+    <div id="previewModal" class="overlay hidden">
+      <div class="modal modal-wide">
+        <h2>原图预览</h2>
+        <img id="previewImg" alt="原图" />
+        <p class="preview-caption" id="previewCaption"></p>
+        <button class="ghost" id="previewClose">关闭</button>
+      </div>
+    </div>
+
+    <footer>
+      <small>按住拼块拖动即可移动 · 「底图提示」可在棋盘上显示半透明原图作参考 · 记录按难度分别保存</small>
+    </footer>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

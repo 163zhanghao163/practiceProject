@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Token 用量统计</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+    color: #e8ecf5;
+    padding: 24px 20px 60px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  h1 .icon { text-shadow: 0 0 14px rgba(0,229,255,.7); }
+  .sub { color: #8fa0bf; font-size: .9rem; margin-bottom: 24px; }
+  .card {
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 18px;
+  }
+  .card h2 { font-size: 1rem; color: #9fd8ff; margin-bottom: 12px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .stat { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); border-radius: 14px; padding: 16px; }
+  .stat .v { font-size: 1.5rem; font-weight: 700; color: #fff; }
+  .stat .l { font-size: .78rem; color: #8fa0bf; margin-top: 4px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: .75rem; color: #8fa0bf; }
+  input, select {
+    background: #141828; color: #e8ecf5; border: 1px solid #3a4060;
+    border-radius: 8px; padding: 8px 10px; font-size: .9rem; font-family: inherit;
+  }
+  input:focus, select:focus { outline: none; border-color: #00e5ff; }
+  input[type="number"] { width: 110px; }
+  button {
+    background: #0e7490; color: #fff; border: none; border-radius: 8px;
+    padding: 9px 16px; font-size: .88rem; cursor: pointer; font-family: inherit;
+    transition: background .15s;
+  }
+  button:hover { background: #0891b2; }
+  button.ghost { background: transparent; border: 1px solid #3a4060; color: #9fb4d0; }
+  button.ghost:hover { border-color: #00e5ff; color: #7fe9ff; }
+  button.danger { background: #7f1d1d; }
+  button.danger:hover { background: #b91c1c; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 800px) { .charts { grid-template-columns: 1fr; } }
+  canvas { width: 100%; height: auto; display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,.08); white-space: nowrap; }
+  th { color: #8fa0bf; font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:hover td { background: rgba(255,255,255,.03); }
+  .tool-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .75rem; background: rgba(0,229,255,.12); color: #7fe9ff; }
+  .del { color: #ff6b6b; cursor: pointer; border: none; background: none; font-size: 1rem; padding: 2px 6px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .empty { color: #5a6b85; text-align: center; padding: 30px 0; font-size: .9rem; }
+  .msg { font-size: .82rem; color: #7fe9ff; min-height: 1.2em; margin-top: 8px; }
+  .drop {
+    border: 2px dashed #3a4060; border-radius: 10px; padding: 18px;
+    text-align: center; color: #8fa0bf; font-size: .85rem; transition: border-color .15s, background .15s;
+  }
+  .drop.over { border-color: #00e5ff; background: rgba(0,229,255,.06); }
+  a.back { color: #7fe9ff; text-decoration: none; font-size: .85rem; }
+  details summary { cursor: pointer; color: #9fd8ff; font-size: .9rem; }
+  details { margin-top: 10px; }
+  .price-row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .price-row .t { width: 110px; font-size: .85rem; color: #cfd3ff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="icon">📊</span> Token 用量统计</h1>
+  <p class="sub">统计 Trae、Codex、Claude、DeepSeek 等各 AI 编程工具的 token 用量与费用 · 数据保存在浏览器本地 <a class="back" href="../index.html">← 返回合集</a></p>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="card">
+    <h2>➕ 手动记账</h2>
+    <div class="row">
+      <div class="field"><label>日期</label><input type="date" id="f-date" /></div>
+      <div class="field"><label>工具</label><select id="f-tool"></select></div>
+      <div class="field"><label>用途 / 项目</label><input type="text" id="f-note" placeholder="如：重构后端模块" style="width:180px" /></div>
+      <div class="field"><label>输入 tokens</label><input type="number" id="f-in" min="0" placeholder="0" /></div>
+      <div class="field"><label>输出 tokens</label><input type="number" id="f-out" min="0" placeholder="0" /></div>
+      <button id="btn-add">添加记录</button>
+    </div>
+    <div class="msg" id="form-msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>🗂 自动扫描工具目录（推荐）</h2>
+    <p style="font-size:.82rem;color:#8fa0bf;margin-bottom:10px">
+      为每个工具选择它的数据目录（如 Claude Code 的 <code style="color:#7fe9ff">~/.claude</code>、Trae / ZCode 的会话数据目录），
+      首次通过系统对话框选择（浏览器不允许手输路径），目录会被记住，之后一键增量重扫。扫描自动识别
+      <code style="color:#7fe9ff">.jsonl / .json / .csv</code> 中的 token 字段，含缓存 token。
+    </p>
+    <div class="row" style="margin-bottom:12px">
+      <div class="field"><label>要配置的工具</label><select id="scan-tool"></select></div>
+      <button id="btn-pick-dir">📁 选择目录并添加</button>
+      <button class="ghost" id="btn-rescan-all">🔄 全部重扫</button>
+      <label class="ghost" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;border:1px solid #3a4060;border-radius:8px;padding:8px 14px;font-size:.85rem">
+        兼容模式（Firefox）<input type="file" id="f-fbdir" webkitdirectory multiple style="display:none" />
+      </label>
+    </div>
+    <div id="sources"></div>
+    <div class="msg" id="scan-msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>📥 导入工具导出文件</h2>
+    <div class="drop" id="drop">把 JSON / JSONL / CSV 文件拖到这里，或 <label style="color:#7fe9ff;cursor:pointer;text-decoration:underline">点击选择文件<input type="file" id="f-file" multiple accept=".json,.jsonl,.csv,.txt" style="display:none" /></label><br />自动识别 input_tokens / prompt_tokens / usage 等常见字段；文件名含工具名（如 claude.jsonl）会自动归类</div>
+    <div class="msg" id="import-msg"></div>
+    <details>
+      <summary>⚙️ 费用单价设置（美元 / 100 万 tokens）</summary>
+      <div id="prices" style="margin-top:12px"></div>
+      <button class="ghost" id="btn-save-prices">保存单价</button>
+    </details>
+  </div>
+
+  <div class="card charts">
+    <div class="card" style="margin:0">
+      <h2>各工具 token 用量</h2>
+      <canvas id="chart-tool" width="480" height="260"></canvas>
+    </div>
+    <div class="card" style="margin:0">
+      <h2>每日用量趋势（近 30 天）</h2>
+      <canvas id="chart-day" width="480" height="260"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📋 使用明细</h2>
+    <div class="toolbar">
+      <select id="f-filter"></select>
+      <button class="ghost" id="btn-export-json">导出 JSON</button>
+      <button class="ghost" id="btn-export-csv">导出 CSV</button>
+      <button class="ghost" id="btn-demo">载入示例数据</button>
+      <button class="danger" id="btn-clear">清空全部</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>日期</th><th>工具</th><th>用途</th><th class="num">输入</th><th class="num">输出</th><th class="num">合计</th><th class="num">费用($)</th><th>来源</th><th></th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const LS_REC = "token-tracker-records", LS_PRICE = "token-tracker-prices", LS_SCAN = "token-tracker-scan";
+  const TOOLS = ["Trae", "Codex", "Claude", "DeepSeek", "ZCode", "Cursor", "Copilot", "ChatGPT", "其他"];
+  // 默认单价：美元 / 1M tokens（混合估算，可自行修改）
+  const DEFAULT_PRICES = {
+    Trae: [3, 12], Codex: [2.5, 10], Claude: [9, 45], DeepSeek: [0.5, 2],
+    ZCode: [3, 12], Cursor: [4, 15], Copilot: [3, 12], ChatGPT: [3, 12], 其他: [3, 12],
+  };
+  const TOOL_COLORS = ["#00e5ff", "#ff6b9b", "#7fff7f", "#ffe98a", "#c792ea", "#ffab70", "#7ad0ff", "#9aa4c0"];
+  const fmt = n => n.toLocaleString("en-US");
+  const fmtK = n => n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1000 ? (n / 1000).toFixed(1) + "K" : String(n);
+  const today = () => new Date().toISOString().slice(0, 10);
+  const $ = id => document.getElementById(id);
+
+  let records = [];
+  let prices = {}, scanState = {};
+  try { records = JSON.parse(localStorage.getItem(LS_REC)) || []; } catch (e) { records = []; }
+  try { prices = JSON.parse(localStorage.getItem(LS_PRICE)) || {}; } catch (e) { prices = {}; }
+  try { scanState = JSON.parse(localStorage.getItem(LS_SCAN)) || {}; } catch (e) { scanState = {}; }
+  for (const t of TOOLS) if (!prices[t]) prices[t] = DEFAULT_PRICES[t].slice();
+  const save = () => { localStorage.setItem(LS_REC, JSON.stringify(records)); localStorage.setItem(LS_PRICE, JSON.stringify(prices)); localStorage.setItem(LS_SCAN, JSON.stringify(scanState)); };
+
+  function costOf(r) {
+    const pr = prices[r.tool] || [3, 12];
+    return (r.in / 1e6) * pr[0] + (r.out / 1e6) * pr[1];
+  }
+
+  // ---------- 表单 ----------
+  const toolSel = $("f-tool"), filterSel = $("f-filter");
+  for (const t of TOOLS) toolSel.add(new Option(t, t));
+  filterSel.add(new Option("全部工具", "全部", true, true));
+  for (const t of TOOLS) filterSel.add(new Option(t, t));
+  $("f-date").value = today();
+
+  $("btn-add").addEventListener("click", () => {
+    const r = {
+      date: $("f-date").value || today(),
+      tool: toolSel.value,
+      note: $("f-note").value.trim(),
+      in: Math.max(0, +$("f-in").value || 0),
+      out: Math.max(0, +$("f-out").value || 0),
+      src: "手动",
+    };
+    if (!r.in && !r.out) { $("form-msg").textContent = "⚠ 请填写输入或输出 tokens"; return; }
+    records.push(r);
+    save(); render();
+    $("f-note").value = ""; $("f-in").value = ""; $("f-out").value = "";
+    $("form-msg").textContent = "✓ 已添加 " + r.tool + " " + fmtK(r.in + r.out) + " tokens";
+  });
+
+  // ---------- 导入 ----------
+  const IN_KEYS = ["input_tokens", "prompt_tokens", "inputTokens", "promptTokens", "input"];
+  const OUT_KEYS = ["output_tokens", "completion_tokens", "outputTokens", "completionTokens", "output"];
+  const CACHE_KEYS = ["cache_read_input_tokens", "cache_creation_input_tokens", "cacheReadInputTokens", "cacheCreationInputTokens"];
+  function extractRecords(obj, srcTool) {
+    // 递归寻找带 token 字段的对象；pd = 父级消息继承的日期（usage 里通常没有时间戳）
+    const found = [];
+    (function walk(o, pd) {
+      if (!o || typeof o !== "object") return;
+      if (Array.isArray(o)) { o.forEach(x => walk(x, pd)); return; }
+      const iK = IN_KEYS.find(k => typeof o[k] === "number");
+      const oK = OUT_KEYS.find(k => typeof o[k] === "number");
+      if (iK !== undefined && oK !== undefined) {
+        let inV = o[iK];
+        for (const ck of CACHE_KEYS) if (typeof o[ck] === "number") inV += o[ck];  // 缓存 token 计入输入
+        found.push({
+          date: pickDateRaw(o) || pd || today(), tool: pickTool(o) || srcTool,
+          note: String(o.model || o.note || o.task || ""),
+          in: inV, out: o[oK], src: "导入",
+        });
+        return; // usage 对象不再深入
+      }
+      const nd = pickDateRaw(o) || pd;
+      const u = o.usage || o.token_usage || o.tokens;
+      if (u && u !== o) walk(u, nd);
+      for (const k of ["message", "response", "result", "data", "entries", "items", "events", "sessions"]) if (o[k]) walk(o[k], nd);
+    })(obj, undefined);
+    return found;
+  }
+  function pickDateRaw(o) {
+    for (const k of ["date", "timestamp", "created_at", "time", "ts", "createdAt"]) {
+      if (o[k]) { const d = new Date(typeof o[k] === "number" && o[k] > 1e11 ? o[k] : (o[k] > 1e9 ? o[k] * 1000 : o[k])); if (!isNaN(d)) return d.toISOString().slice(0, 10); }
+    }
+    return null;
+  }
+  function pickDate(o) { return pickDateRaw(o) || today(); }
+  function pickTool(o) {
+    const s = (o.tool || o.source || o.app || "").toString().toLowerCase();
+    if (!s) return "";
+    return TOOLS.find(t => s.includes(t.toLowerCase())) || TOOLS.find(t => s.includes(t.toLowerCase().slice(0, 4))) || "";
+  }
+  function toolFromFilename(name) {
+    const n = name.toLowerCase();
+    return TOOLS.find(t => n.includes(t.toLowerCase())) || "";
+  }
+  function parseCsv(text, fname) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return [];
+    const head = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/["']/g, ""));
+    const iI = head.findIndex(h => IN_KEYS.includes(h)), iO = head.findIndex(h => OUT_KEYS.includes(h));
+    const iD = head.findIndex(h => ["date", "timestamp", "time"].includes(h));
+    const iT = head.findIndex(h => ["tool", "source", "app"].includes(h));
+    const iN = head.findIndex(h => ["note", "model", "task", "memo"].includes(h));
+    if (iI < 0 && iO < 0) return [];
+    const srcTool = toolFromFilename(fname);
+    return lines.slice(1).map(line => {
+      const cells = line.match(/("([^"]|"")*"|[^,]*)(,|$)/g).map(c => c.replace(/,$/, "").replace(/^"|"$/g, "").replace(/""/g, '"'));
+      return {
+        date: iD >= 0 ? (cells[iD] || "").slice(0, 10) || today() : today(),
+        tool: iT >= 0 ? (TOOLS.find(t => (cells[iT] || "").toLowerCase().includes(t.toLowerCase())) || srcTool || "其他") : (srcTool || "其他"),
+        note: iN >= 0 ? cells[iN] || "" : "",
+        in: Math.round(+cells[iI] || 0), out: Math.round(+cells[iO] || 0), src: "导入",
+      };
+    }).filter(r => r.in || r.out);
+  }
+  function handleFiles(files) {
+    let pending = files.length, added = 0;
+    const msgs = [];
+    for (const f of files) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result);
+        const srcTool = toolFromFilename(f.name);
+        let recs = [];
+        if (f.name.endsWith(".csv") || (text.includes(",") && !text.trim().startsWith("{") && !text.trim().startsWith("["))) {
+          recs = parseCsv(text, f.name);
+        } else {
+          try {
+            if (text.trim().startsWith("[")) recs = extractRecords(JSON.parse(text), srcTool);
+            else {
+              for (const line of text.split(/\r?\n/)) {   // JSONL
+                if (!line.trim()) continue;
+                try { recs.push(...extractRecords(JSON.parse(line), srcTool)); } catch (e) { /* 跳过坏行 */ }
+              }
+            }
+          } catch (e) { msgs.push(f.name + " 解析失败"); }
+        }
+        if (!srcTool) for (const r of recs) if (!r.tool) r.tool = "其他";
+        records.push(...recs); added += recs.length;
+        if (recs.length) msgs.push(f.name + ": " + recs.length + " 条" + (srcTool ? " → " + srcTool : ""));
+        if (--pending === 0) {
+          save(); render();
+          $("import-msg").textContent = added ? "✓ 共导入 " + added + " 条 · " + msgs.join(" ｜ ") : "⚠ 未识别到 token 数据 · " + msgs.join(" ｜ ");
+        }
+      };
+      reader.readAsText(f);
+    }
+  }
+  $("f-file").addEventListener("change", e => { if (e.target.files.length) handleFiles([...e.target.files]); e.target.value = ""; });
+  const drop = $("drop");
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files.length) handleFiles([...e.dataTransfer.files]); });
+
+  // ---------- 目录自动扫描 ----------
+  const SCAN_TOOLS = TOOLS.filter(t => t !== "其他");
+  const scanToolSel = $("scan-tool");
+  for (const t of SCAN_TOOLS) scanToolSel.add(new Option(t, t));
+
+  function idb() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open("token-tracker", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("dirs");
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  async function idbSet(k, v) { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction("dirs", "readwrite"); tx.objectStore("dirs").put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+  async function idbDel(k) { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction("dirs", "readwrite"); tx.objectStore("dirs").delete(k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+  async function idbAll() {
+    const db = await idb();
+    return new Promise((res, rej) => {
+      const tx = db.transaction("dirs", "readonly"), out = {};
+      tx.objectStore("dirs").openCursor().onsuccess = e => {
+        const c = e.target.result;
+        if (c) { out[c.key] = c.value; c.continue(); }
+      };
+      tx.oncomplete = () => res(out);
+      tx.onerror = () => rej(tx.error);
+    });
+  }
+
+  function parseScanText(text, name, tool) {
+    let recs = [];
+    try {
+      if (/\.csv$/i.test(name) || (text.includes(",") && !text.trim().startsWith("{") && !text.trim().startsWith("["))) {
+        recs = parseCsv(text, name);
+      } else if (text.trim().startsWith("[")) {
+        recs = extractRecords(JSON.parse(text), tool);
+      } else {
+        for (const line of text.split(/\r?\n/)) {
+          if (!line.trim()) continue;
+          try { recs.push(...extractRecords(JSON.parse(line), tool)); } catch (e) { /* 坏行跳过 */ }
+        }
+      }
+    } catch (e) { return null; }
+    if (!recs.length) return null;
+    const sum = recs.reduce((a, r) => ({ in: a.in + r.in, out: a.out + r.out }), { in: 0, out: 0 });
+    const dates = recs.map(r => r.date).filter(Boolean).sort();
+    return { tool, in: sum.in, out: sum.out, date: dates[dates.length - 1] || today(), src: "扫描", events: recs.length };
+  }
+  function upsertScanRecord(rec) {
+    const i = records.findIndex(r => r.key === rec.key);
+    if (i >= 0) records[i] = rec; else records.push(rec);
+  }
+
+  async function scanHandle(dirHandle, tool, onProgress) {
+    let scanned = 0, files = 0;
+    const seen = new Set();
+    async function walk(dir, rel, depth) {
+      if (depth > 6) return;
+      for await (const [name, h] of dir.entries()) {
+        if (name === "node_modules" || name === ".git" || name === ".cache") continue;
+        if (h.kind === "directory") { await walk(h, rel + name + "/", depth + 1); continue; }
+        if (!/\.(jsonl|json|csv)$/i.test(name)) continue;
+        files++;
+        const key = tool + "|" + rel + name;
+        seen.add(key);
+        const f = await h.getFile();
+        const st = scanState[key];
+        if (st && st.size === f.size && st.mtime === f.lastModified) continue;   // 增量：没变就跳过
+        if (f.size > 30 * 1024 * 1024) continue;                                  // 跳过大文件
+        const parsed = parseScanText(await f.text(), name, tool);
+        if (!parsed) continue;
+        parsed.key = key; parsed.note = rel + name;
+        upsertScanRecord(parsed);
+        scanState[key] = { size: f.size, mtime: f.lastModified };
+        scanned++;
+        if (scanned % 20 === 0) onProgress(`已扫描 ${files} 个文件，解析 ${scanned} 个…`);
+      }
+    }
+    await walk(dirHandle, "", 0);
+    // 清理已删除文件的旧记录
+    for (const k of Object.keys(scanState)) {
+      if (k.startsWith(tool + "|") && !seen.has(k)) {
+        delete scanState[k];
+        const i = records.findIndex(r => r.key === k);
+        if (i >= 0) records.splice(i, 1);
+      }
+    }
+    return { scanned, files };
+  }
+
+  async function rescanSource(tool, dirHandle) {
+    let perm = "granted";
+    if (dirHandle.queryPermission) perm = await dirHandle.queryPermission({ mode: "read" });
+    if (perm !== "granted" && dirHandle.requestPermission) perm = await dirHandle.requestPermission({ mode: "read" });
+    if (perm !== "granted") { $("scan-msg").textContent = `⚠ ${tool} 目录未获授权，请重试`; return null; }
+    $("scan-msg").textContent = `⏳ 正在扫描 ${tool} …`;
+    const r = await scanHandle(dirHandle, tool, m => { $("scan-msg").textContent = m; });
+    save(); render(); renderSources();
+    $("scan-msg").textContent = `✓ ${tool}: 扫描 ${r.files} 个文件，更新 ${r.scanned} 个`;
+    return r;
+  }
+
+  async function renderSources() {
+    const all = await idbAll();
+    const el = $("sources");
+    const keys = Object.keys(all);
+    if (!keys.length) { el.innerHTML = `<div class="empty">尚未配置目录 · 选择工具后点「选择目录并添加」</div>`; return; }
+    el.innerHTML = keys.map(storeKey => {
+      const tool = storeKey.replace(/^dir:/, "");   // 存储键是 "dir:工具名"，去掉前缀才是真名
+      const st = all[storeKey];
+      let n = 0, sum = 0;
+      for (const sk in scanState) if (sk.startsWith(tool + "|")) { n++; const r = records.find(x => x.key === sk); if (r) sum += r.in + r.out; }
+      return `<div class="price-row" style="background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px">
+        <span class="tool-chip">${tool}</span>
+        <span style="font-size:.82rem;color:#cfd3ff;flex:1;overflow:hidden;text-overflow:ellipsis" title="${st.label}">📁 ${st.label}</span>
+        <span style="font-size:.78rem;color:#8fa0bf">${n} 个文件 · ${fmtK(sum)} tokens</span>
+        <button class="ghost" data-rescan="${tool}">重扫</button>
+        <button class="del" data-remove="${tool}" title="移除目录">✕</button>
+      </div>`;
+    }).join("");
+    el.querySelectorAll("[data-rescan]").forEach(b => b.addEventListener("click", async () => {
+      const all2 = await idbAll();
+      const st2 = all2["dir:" + b.dataset.rescan];
+      if (st2) await rescanSource(b.dataset.rescan, st2.handle);
+    }));
+    el.querySelectorAll("[data-remove]").forEach(b => b.addEventListener("click", async () => {
+      const tool = b.dataset.remove;
+      await idbDel("dir:" + tool);
+      for (const k of Object.keys(scanState)) if (k.startsWith(tool + "|")) { delete scanState[k]; const i = records.findIndex(r => r.key === k); if (i >= 0) records.splice(i, 1); }
+      save(); renderSources(); render();
+    }));
+  }
+
+  $("btn-pick-dir").addEventListener("click", async () => {
+    if (!window.showDirectoryPicker) {
+      $("scan-msg").textContent = "⚠ 当前浏览器不支持目录选择，请用「兼容模式」选择文件夹，或使用附带的 scan-cli.mjs";
+      return;
+    }
+    try {
+      const tool = scanToolSel.value;
+      const handle = await window.showDirectoryPicker();
+      await idbSet("dir:" + tool, { handle, label: handle.name });
+      await rescanSource(tool, handle);
+    } catch (e) { if (e.name !== "AbortError") $("scan-msg").textContent = "✕ " + e.message; }
+  });
+  $("btn-rescan-all").addEventListener("click", async () => {
+    const all = await idbAll(), keys = Object.keys(all);
+    if (!keys.length) { $("scan-msg").textContent = "⚠ 尚未配置任何目录"; return; }
+    let ok = 0;
+    for (const k of keys) { const tool = k.replace(/^dir:/, ""); const r = await rescanSource(tool, all[k].handle); if (r) ok++; }
+    if (ok) $("scan-msg").textContent = `✓ 已重扫 ${ok} 个目录`;
+  });
+  $("f-fbdir").addEventListener("change", e => {
+    const tool = scanToolSel.value;
+    let n = 0;
+    for (const f of e.target.files) {
+      if (!/\.(jsonl|json|csv)$/i.test(f.name) || f.size > 30 * 1024 * 1024) continue;
+      const rel = f.webkitRelativePath || f.name;
+      const key = tool + "|fb|" + rel;
+      f.text().then(text => {
+        const parsed = parseScanText(text, f.name, tool);
+        if (!parsed) return;
+        parsed.key = key; parsed.note = rel;
+        upsertScanRecord(parsed);
+        scanState[key] = { size: f.size, mtime: f.lastModified };
+        n++; save();
+      });
+    }
+    setTimeout(() => { save(); render(); renderSources(); $("scan-msg").textContent = `✓ 兼容模式扫描完成，解析 ${n} 个文件`; }, 1200);
+    e.target.value = "";
+  });
+
+  // ---------- 单价设置 ----------
+  function renderPrices() {
+    $("prices").innerHTML = TOOLS.map(t =>
+      `<div class="price-row"><span class="t">${t}</span>
+       <label style="font-size:.75rem;color:#8fa0bf">输入</label><input type="number" step="0.1" min="0" data-tool="${t}" data-k="0" value="${prices[t][0]}" />
+       <label style="font-size:.75rem;color:#8fa0bf">输出</label><input type="number" step="0.1" min="0" data-tool="${t}" data-k="1" value="${prices[t][1]}" />
+       <span style="font-size:.75rem;color:#5a6b85">$ / 1M</span></div>`
+    ).join("");
+  }
+  $("btn-save-prices").addEventListener("click", () => {
+    $("prices").querySelectorAll("input").forEach(el => { prices[el.dataset.tool][+el.dataset.k] = Math.max(0, +el.value || 0); });
+    save(); render(); $("import-msg").textContent = "✓ 单价已保存，费用已重新计算";
+  });
+
+  // ---------- 导出 / 清空 / 示例 ----------
+  function download(name, text, mime) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+    a.download = name; a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  $("btn-export-json").addEventListener("click", () => download("token-usage-" + today() + ".json", JSON.stringify(records, null, 2), "application/json"));
+  $("btn-export-csv").addEventListener("click", () => {
+    const csv = "date,tool,note,input_tokens,output_tokens,source\n" +
+      records.map(r => [r.date, r.tool, '"' + (r.note || "").replace(/"/g, '""') + '"', r.in, r.out, r.src].join(",")).join("\n");
+    download("token-usage-" + today() + ".csv", csv, "text/csv");
+  });
+  $("btn-clear").addEventListener("click", () => {
+    if (!records.length) return;
+    if (confirm("确定清空全部 " + records.length + " 条记录？此操作不可恢复。")) { records = []; save(); render(); }
+  });
+  $("btn-demo").addEventListener("click", () => {
+    const notes = ["重构登录模块", "写单元测试", "排查线上 bug", "生成 API 文档", "代码评审", "新功能开发"];
+    const recs = [];
+    for (let d = 29; d >= 0; d--) {
+      const date = new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
+      const n = Math.random() < 0.25 ? 0 : 1 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < n; i++) {
+        const tool = TOOLS[Math.floor(Math.random() * 6)];
+        recs.push({ date, tool, note: notes[Math.floor(Math.random() * notes.length)], in: 2000 + Math.floor(Math.random() * 90000), out: 500 + Math.floor(Math.random() * 20000), src: "示例" });
+      }
+    }
+    records.push(...recs); save(); render();
+  });
+
+  // ---------- 渲染 ----------
+  function render() {
+    const filter = filterSel.value;
+    const list = records.filter(r => filter === "全部" || r.tool === filter).slice().sort((a, b) => b.date.localeCompare(a.date));
+    const totIn = list.reduce((s, r) => s + r.in, 0), totOut = list.reduce((s, r) => s + r.out, 0);
+    const totCost = list.reduce((s, r) => s + costOf(r), 0);
+    const days = new Set(list.map(r => r.date)).size;
+
+    $("stats").innerHTML = [
+      [fmtK(totIn + totOut), "总 tokens"],
+      [fmtK(totIn), "输入 tokens"],
+      [fmtK(totOut), "输出 tokens"],
+      ["$" + totCost.toFixed(2), "估算费用"],
+      [list.length, "记录数"],
+      [days, "活跃天数"],
+    ].map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+
+    $("tbody").innerHTML = list.length ? list.map((r, i) =>
+      `<tr><td>${r.date}</td><td><span class="tool-chip">${r.tool}</span></td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${r.note || "—"}</td>
+       <td class="num">${fmt(r.in)}</td><td class="num">${fmt(r.out)}</td><td class="num">${fmt(r.in + r.out)}</td>
+       <td class="num">${costOf(r).toFixed(4)}</td><td style="color:#5a6b85">${r.src}</td>
+       <td><button class="del" data-i="${records.indexOf(r)}" title="删除">✕</button></td></tr>`
+    ).join("") : `<tr><td colspan="9" class="empty">暂无记录 · 手动添加、导入文件或载入示例数据</td></tr>`;
+    $("tbody").querySelectorAll(".del").forEach(b => b.addEventListener("click", () => {
+      const r = records[+b.dataset.i];
+      if (r && r.key) delete scanState[r.key];   // 删除扫描记录后，重扫才会重新计入
+      records.splice(+b.dataset.i, 1); save(); render();
+    }));
+
+    drawToolChart(list);
+    drawDayChart(list);
+  }
+
+  function drawToolChart(list) {
+    const cv = $("chart-tool"), ctx = cv.getContext("2d");
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    const byTool = {};
+    for (const r of list) byTool[r.tool] = (byTool[r.tool] || 0) + r.in + r.out;
+    const entries = Object.entries(byTool).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) { emptyChart(ctx, cv, "暂无数据"); return; }
+    const max = entries[0][1], W = cv.width, H = cv.height;
+    const bw = Math.min(64, (W - 60) / entries.length - 14);
+    ctx.font = "11px sans-serif";
+    entries.forEach(([t, v], i) => {
+      const x = 40 + i * ((W - 50) / entries.length) + 4;
+      const h = Math.max(3, (v / max) * (H - 70));
+      ctx.fillStyle = TOOL_COLORS[TOOLS.indexOf(t) % TOOL_COLORS.length];
+      ctx.fillRect(x, H - 36 - h, bw, h);
+      ctx.fillStyle = "#e8ecf5"; ctx.textAlign = "center";
+      ctx.fillText(fmtK(v), x + bw / 2, H - 42 - h);
+      ctx.fillStyle = "#8fa0bf";
+      ctx.fillText(t, x + bw / 2, H - 20);
+    });
+    ctx.textAlign = "left";
+  }
+  function drawDayChart(list) {
+    const cv = $("chart-day"), ctx = cv.getContext("2d");
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    const byDay = {};
+    for (const r of list) byDay[r.date] = (byDay[r.date] || 0) + r.in + r.out;
+    const days = [];
+    for (let d = 29; d >= 0; d--) days.push(new Date(Date.now() - d * 864e5).toISOString().slice(0, 10));
+    const vals = days.map(d => byDay[d] || 0);
+    const max = Math.max(...vals, 1);
+    if (!vals.some(v => v)) { emptyChart(ctx, cv, "近 30 天暂无数据"); return; }
+    const W = cv.width, H = cv.height, px_ = (W - 50) / 29, baseY = H - 34, top = 18;
+    ctx.strokeStyle = "#00e5ff"; ctx.lineWidth = 2; ctx.beginPath();
+    vals.forEach((v, i) => {
+      const x = 36 + i * px_, y = baseY - (v / max) * (baseY - top);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.stroke();
+    vals.forEach((v, i) => {
+      const x = 36 + i * px_, y = baseY - (v / max) * (baseY - top);
+      ctx.fillStyle = "#00e5ff"; ctx.fillRect(x - 2, y - 2, 4, 4);
+    });
+    ctx.fillStyle = "#8fa0bf"; ctx.font = "10px sans-serif";
+    ctx.fillText(days[0].slice(5), 20, H - 14);
+    ctx.fillText(days[29].slice(5), W - 44, H - 14);
+    ctx.fillText(fmtK(max), 2, 14);
+    ctx.textAlign = "left";
+  }
+  function emptyChart(ctx, cv, msg) {
+    ctx.fillStyle = "#5a6b85"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(msg, cv.width / 2, cv.height / 2);
+    ctx.textAlign = "left";
+  }
+
+  filterSel.addEventListener("change", render);
+  // 清理旧版本 bug 留下的脏数据（工具名被写成 "dir:xxx" 的扫描状态和记录）
+  let dirty = false;
+  for (const k of Object.keys(scanState)) if (k.startsWith("dir:")) { delete scanState[k]; dirty = true; }
+  const n0 = records.length;
+  records = records.filter(r => !String(r.tool || "").startsWith("dir:"));
+  if (dirty || records.length !== n0) save();
+  renderPrices();
+  render();
+  renderSources();
+})();
+</script>
+</body>
+</html>
