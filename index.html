@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>小游戏合集</title>
+<title>小游戏 & 工具合集</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
@@ -21,13 +21,21 @@
     margin-bottom: 8px;
     text-shadow: 0 0 12px rgba(0, 229, 255, .6);
   }
-  p.subtitle { color: #9fb4d0; margin-bottom: 40px; }
+  p.subtitle { color: #9fb4d0; margin-bottom: 36px; }
+  section { width: 100%; max-width: 1080px; margin-bottom: 36px; }
+  section > h2 {
+    font-size: 1.15rem;
+    letter-spacing: 2px;
+    color: #cfeaff;
+    padding-left: 12px;
+    border-left: 4px solid #00e5ff;
+    margin-bottom: 16px;
+  }
+  section.tools > h2 { border-color: #7aff8a; color: #d8ffd8; }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 320px));
     gap: 24px;
-    width: 100%;
-    max-width: 1080px;
   }
   a.card {
     display: block;
@@ -44,20 +52,14 @@
     border-color: #00e5ff;
     box-shadow: 0 12px 30px rgba(0, 229, 255, .18);
   }
-  .icon { font-size: 3rem; margin-bottom: 14px; }
-  a.card h2 { font-size: 1.3rem; margin-bottom: 8px; }
-  a.card p { color: #9fb4d0; font-size: .95rem; line-height: 1.5; }
-  .tag {
-    display: inline-block;
-    margin-top: 14px;
-    font-size: .75rem;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: rgba(0, 229, 255, .15);
-    color: #7fe9ff;
+  section.tools a.card:hover {
+    border-color: #7aff8a;
+    box-shadow: 0 12px 30px rgba(122, 255, 138, .15);
   }
-  .tag.new { background: rgba(255, 107, 107, .15); color: #ff9b9b; }
-  footer { margin-top: 50px; color: #5a6b85; font-size: .85rem; }
+  .icon { font-size: 3rem; margin-bottom: 14px; }
+  a.card h3 { font-size: 1.3rem; margin-bottom: 8px; }
+  a.card p { color: #9fb4d0; font-size: .95rem; line-height: 1.5; }
+  footer { margin-top: 20px; color: #5a6b85; font-size: .85rem; }
   @media (max-width: 480px) {
     body { padding: 24px 12px; }
     h1 { font-size: 1.6rem; }
@@ -69,38 +71,44 @@
 <body>
   <h1>🎮 小游戏 & 工具合集</h1>
   <p class="subtitle">选择一个开始</p>
-  <div class="grid">
-    <a class="card" href="./puzzle-game/index.html">
-      <div class="icon">🧩</div>
-      <h2>拼图小游戏</h2>
-      <p>经典拼图玩法，把打乱的碎块还原成完整图片。</p>
-      <span class="tag">已有游戏</span>
-    </a>
-    <a class="card" href="./drag-puzzle-game/index.html">
-      <div class="icon">🖱️</div>
-      <h2>拖拽拼图</h2>
-      <p>拖拽碎块交换位置，考验观察力与耐心。</p>
-      <span class="tag">已有游戏</span>
-    </a>
-    <a class="card" href="./pixel-adventure/index.html">
-      <div class="icon">🕹️</div>
-      <h2>像素大冒险</h2>
-      <p>像素风横版闯关：跳跃、躲避、收集金币，闯过所有关卡！</p>
-      <span class="tag new">新游戏</span>
-    </a>
-    <a class="card" href="./roguelike-arena/index.html">
-      <div class="icon">⚔️</div>
-      <h2>像素勇者 · 怪物围城</h2>
-      <p>肉鸽割草：杀穿怪潮，升级三选一天赋，每 2 分钟一局精英，坚持 8 分钟获胜！</p>
-      <span class="tag new">新游戏</span>
-    </a>
-    <a class="card" href="./token-usage-tracker/index.html">
-      <div class="icon">📊</div>
-      <h2>Token 用量统计</h2>
-      <p>统计 Trae / Codex / Claude / DeepSeek 等工具的 token 用量与费用，支持导入导出。</p>
-      <span class="tag" style="background:rgba(122,255,138,.15);color:#9dffb0">工具</span>
-    </a>
-  </div>
-  <footer>纯前端小游戏 · 无需安装，点击即玩</footer>
+
+  <section>
+    <h2>🎮 游戏</h2>
+    <div class="grid">
+      <a class="card" href="./puzzle-game/index.html">
+        <div class="icon">🧩</div>
+        <h3>拼图小游戏</h3>
+        <p>经典滑块拼图玩法，把打乱的碎块还原成完整图片。</p>
+      </a>
+      <a class="card" href="./drag-puzzle-game/index.html">
+        <div class="icon">🖱️</div>
+        <h3>拖拽拼图</h3>
+        <p>拖拽碎块交换位置，考验观察力与耐心。</p>
+      </a>
+      <a class="card" href="./pixel-adventure/index.html">
+        <div class="icon">🕹️</div>
+        <h3>像素大冒险</h3>
+        <p>像素风横版闯关：跳跃、躲避、收集金币，闯过所有关卡！</p>
+      </a>
+      <a class="card" href="./roguelike-arena/index.html">
+        <div class="icon">⚔️</div>
+        <h3>像素勇者 · 怪物围城</h3>
+        <p>肉鸽割草：大地图走位，升级三选一天赋，限时存活与无尽刷分两种模式！</p>
+      </a>
+    </div>
+  </section>
+
+  <section class="tools">
+    <h2>🛠️ 工具</h2>
+    <div class="grid">
+      <a class="card" href="./token-usage-tracker/index.html">
+        <div class="icon">📊</div>
+        <h3>Token 用量统计</h3>
+        <p>统计 Trae / Codex / Claude / DeepSeek 等工具的 token 用量与费用，支持目录扫描与导入导出。</p>
+      </a>
+    </div>
+  </section>
+
+  <footer>纯前端项目 · 无需安装，点击即玩</footer>
 </body>
 </html>
