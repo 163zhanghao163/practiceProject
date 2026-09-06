@@ -230,6 +230,9 @@
         else if (ch === "F") flag = { x: x + TILE/2, y: y + TILE };
       }
     }
+    // 标记地表砖块（最上层的草皮/石面）
+    const gset = new Set(solids.filter(s => s.t === "ground").map(s => s.x + "," + s.y));
+    for (const s of solids) if (s.t === "ground") s.top = !gset.has(s.x + "," + (s.y - TILE));
     flagLocked = !!L.coinGate;
     camX = 0;
   }
@@ -388,27 +391,84 @@
   }
 
   function drawBackground(L) {
-    px(0, 0, VIEW_W, VIEW_H, L.sky);
+    // 天空渐变
+    const sky = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+    if (levelIdx === 0) { sky.addColorStop(0, "#3f8cff"); sky.addColorStop(0.65, "#8fc4ff"); sky.addColorStop(1, "#d6ecff"); }
+    else if (levelIdx === 1) { sky.addColorStop(0, "#0b0817"); sky.addColorStop(1, "#241a3e"); }
+    else { sky.addColorStop(0, "#1a0d12"); sky.addColorStop(0.7, "#3d1414"); sky.addColorStop(1, "#61201a"); }
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     if (levelIdx === 0) {
+      // 太阳
+      px(792, 54, 48, 48, "#fff7d6"); px(800, 62, 32, 32, "#ffe98a");
+      // 远山（两层视差）
+      ctx.fillStyle = "#6d97c9";
+      for (let i = 0; i < 6; i++) {
+        const mx = ((i * 340 - camX * 0.15) % (VIEW_W + 680) + VIEW_W + 680) % (VIEW_W + 680) - 340;
+        ctx.beginPath(); ctx.moveTo(mx, 420); ctx.lineTo(mx + 170, 250 + (i % 2) * 44); ctx.lineTo(mx + 340, 420); ctx.fill();
+      }
+      ctx.fillStyle = "#8fb7e3";
+      for (let i = 0; i < 6; i++) {
+        const mx = ((i * 380 - camX * 0.25) % (VIEW_W + 760) + VIEW_W + 760) % (VIEW_W + 760) - 380;
+        ctx.beginPath(); ctx.moveTo(mx, 430); ctx.lineTo(mx + 190, 316 + (i % 2) * 30); ctx.lineTo(mx + 380, 430); ctx.fill();
+      }
+      // 树线（中视差）
+      for (let i = 0; i < 9; i++) {
+        const tx = ((i * 240 - camX * 0.4) % (VIEW_W + 480) + VIEW_W + 480) % (VIEW_W + 480) - 240;
+        px(tx + 27, 404, 12, 42, "#6a4326"); px(tx + 30, 404, 3, 42, "#7d5230");
+        ctx.fillStyle = i % 2 ? "#2f7d33" : "#37913c";
+        ctx.beginPath(); ctx.moveTo(tx - 4, 414); ctx.lineTo(tx + 34, 414); ctx.lineTo(tx + 15, 350); ctx.fill();
+        ctx.fillStyle = i % 2 ? "#3d9442" : "#4aa84f";
+        ctx.beginPath(); ctx.moveTo(tx + 2, 382); ctx.lineTo(tx + 29, 382); ctx.lineTo(tx + 15, 338); ctx.fill();
+      }
+      // 云（快视差）
       for (let i = 0; i < 5; i++) {
-        const cx = (i * 260 - camX * 0.4) % (VIEW_W + 160) - 80;
-        px(cx + 20, 60 + i * 18, 40, 12, "#ffffff");
-        px(cx + 34, 48 + i * 18, 30, 14, "#ffffff");
+        const cx = ((i * 260 - camX * 0.5) % (VIEW_W + 320) + VIEW_W + 320) % (VIEW_W + 320) - 160;
+        const cy = 48 + i * 20;
+        px(cx + 20, cy + 8, 44, 12, "rgba(255,255,255,.93)");
+        px(cx + 34, cy, 30, 14, "rgba(255,255,255,.93)");
+        px(cx + 26, cy + 4, 16, 7, "#f4f8ff");
       }
     } else if (levelIdx === 1) {
+      // 洞窟：悬浮微光 + 钟乳石 + 发光水晶
       for (let i = 0; i < 40; i++) {
-        const sx = (i * 137 + 40 - camX * 0.3) % VIEW_W, sy = (i * 89) % 260;
-        px(sx, sy, 2, 2, "rgba(255,255,255,.6)");
+        const sx = ((i * 137 - camX * 0.3) % VIEW_W + VIEW_W) % VIEW_W, sy = (i * 89) % 240;
+        px(sx, sy, 2, 2, "rgba(180,160,255,.45)");
       }
-      for (let i = 0; i < 7; i++) {                     // 洞窟钟乳石
-        const sx = (i * 170 + 60 - camX * 0.5) % (VIEW_W + 200) - 100;
+      ctx.fillStyle = "#120c22";
+      for (let i = 0; i < 8; i++) {
+        const sx = ((i * 170 - camX * 0.5) % (VIEW_W + 200) + VIEW_W + 200) % (VIEW_W + 200) - 100;
         const h = 50 + (i % 3) * 34;
-        ctx.fillStyle = "#120c22";
-        ctx.beginPath();
-        ctx.moveTo(sx, 0); ctx.lineTo(sx + 26, 0); ctx.lineTo(sx + 13, h);
-        ctx.fill();
+        ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx + 26, 0); ctx.lineTo(sx + 13, h); ctx.fill();
+      }
+      for (let i = 0; i < 6; i++) {
+        const cx2 = ((i * 300 - camX * 0.45) % (VIEW_W + 300) + VIEW_W + 300) % (VIEW_W + 300) - 150;
+        const gl = 0.55 + Math.sin(tick * 0.05 + i * 2) * 0.35;
+        ctx.globalAlpha = gl * 0.3;
+        px(cx2 - 4, 462, 30, 12, "#7ad0ff");
+        ctx.globalAlpha = gl;
+        ctx.fillStyle = "#b0e4ff";
+        ctx.beginPath(); ctx.moveTo(cx2, 504); ctx.lineTo(cx2 + 7, 458); ctx.lineTo(cx2 + 14, 504); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(cx2 + 13, 504); ctx.lineTo(cx2 + 19, 472); ctx.lineTo(cx2 + 25, 504); ctx.fill();
+        ctx.globalAlpha = 1;
       }
     } else {
+      // 熔岩要塞：远处火山 + 城垛剪影 + 火星
+      ctx.fillStyle = "#26090b";
+      for (let i = 0; i < 5; i++) {
+        const vx = ((i * 420 - camX * 0.18) % (VIEW_W + 840) + VIEW_W + 840) % (VIEW_W + 840) - 420;
+        ctx.beginPath(); ctx.moveTo(vx, 430); ctx.lineTo(vx + 210, 206 + (i % 2) * 50); ctx.lineTo(vx + 420, 430); ctx.fill();
+      }
+      ctx.fillStyle = "#1a0608";
+      for (let i = 0; i < 10; i++) {
+        const fx = ((i * 190 - camX * 0.32) % (VIEW_W + 380) + VIEW_W + 380) % (VIEW_W + 380) - 190;
+        px(fx, 352, 92, 88, "#1a0608");
+        for (let m = 0; m < 3; m++) px(fx + 6 + m * 30, 338, 18, 16, "#1a0608");
+      }
+      ctx.fillStyle = "rgba(255,90,40,.5)";
+      for (let i = 0; i < 10; i++) {
+        const fx = ((i * 190 - camX * 0.32) % (VIEW_W + 380) + VIEW_W + 380) % (VIEW_W + 380) - 190;
+        px(fx + 44, 352, 4, 3, "rgba(255,110,40,.65)");
+      }
       for (const em of embers) {                        // 熔岩火星上升
         em.y -= em.s;
         em.x += Math.sin(tick * 0.03 + em.ph) * 0.4;
@@ -421,34 +481,96 @@
   function drawPlayer(p) {
     if (p.inv > 0 && (tick >> 2) % 2) return;
     const x = Math.round(p.x), y = Math.round(p.y), f = p.face;
-    px(x + 4, y, 18, 6, "#e02020");
-    px(x + (f>0?14:4), y + 2, 8, 4, "#e02020");
-    px(x + 6, y + 6, 14, 10, "#ffcc99");
-    px(x + (f>0?14:8), y + 8, 3, 3, "#222");
-    px(x + 4, y + 16, 18, 10, "#2255cc");
-    const step = p.onGround && Math.abs(p.vx) > 0.4 ? (tick >> 3) % 2 : 0;
-    px(x + 4 + step * 4, y + 26, 7, 8, "#5a3a1a");
-    px(x + 15 - step * 4, y + 26, 7, 8, "#5a3a1a");
+    const O = "#241a2e";                                 // 全身描边色
+    const run = p.onGround && Math.abs(p.vx) > 0.4;
+    const step = run ? (tick >> 3) % 4 : 0;              // 四帧行走
+    const bob = run && (step === 1 || step === 3) ? 1 : 0;
+    const b = y + bob;                                   // 身体原点（含跑动起伏）
+    if (p.onGround) {                                    // 脚下阴影
+      ctx.fillStyle = "rgba(0,0,0,.25)";
+      ctx.beginPath(); ctx.ellipse(x + 13, y + 33, 11, 3.5, 0, 0, 7); ctx.fill();
+    }
+    // ---- 帽子 ----
+    px(x + 3, b + 1, 20, 6, O);
+    px(x + 4, b + 2, 18, 3, "#e84343");
+    px(x + 4, b + 1, 18, 2, "#ff6b6b");
+    px(f > 0 ? x + 17 : x + 1, b + 4, 8, 2, "#c22525");  // 帽檐朝向脸
+    // ---- 脸 ----
+    px(x + 4, b + 6, 18, 11, O);
+    px(x + 5, b + 7, 16, 9, "#ffc98f");
+    px(f > 0 ? x + 5 : x + 17, b + 7, 4, 5, "#7a4322");  // 后脑勺头发
+    px(f > 0 ? x + 14 : x + 8, b + 9, 3, 4, "#20242e");  // 眼睛
+    px(f > 0 ? x + 15 : x + 8, b + 9, 1, 1, "#ffffff");  // 眼中高光
+    px(f > 0 ? x + 15 : x + 7, b + 13, 4, 1, "#e89a6a"); // 腮红
+    // ---- 身体 ----
+    px(x + 3, b + 16, 20, 10, O);
+    px(x + 4, b + 17, 18, 7, "#2f66d0");
+    px(x + 4, b + 17, 18, 2, "#5a8ae8");                 // 衣服高光
+    px(x + 4, b + 23, 18, 3, "#4a2f1a");                 // 腰带
+    px(x + 11, b + 23, 4, 3, "#ffd23b");                 // 金扣
+    const arm = run ? (step < 2 ? 1 : -1) : (p.onGround ? 0 : -2);
+    px(x + 1, b + 17 + arm, 3, 7, O); px(x + 2, b + 18 + arm, 2, 5, "#ffc98f");           // 后手
+    px(x + 22, b + 17 - arm, 3, 7, O); px(x + 22, b + 18 - arm, 2, 5, "#ffc98f");         // 前手
+    // ---- 腿脚 ----
+    if (p.onGround) {
+      const la = step === 1 ? 3 : step === 3 ? -3 : 0;
+      px(x + 5, b + 25, 8, 9, O); px(x + 13, b + 25, 8, 9, O);
+      px(x + 6, b + 26 + Math.max(0, -la), 6, 7 - Math.max(0, -la), "#6a4525");
+      px(x + 14, b + 26 + Math.max(0, la), 6, 7 - Math.max(0, la), "#5a3a1a");
+      px(x + 6 + Math.max(0, la * -1) * 0, b + 32, 6, 2, "#33210f");   // 鞋底
+      px(x + 14, b + 32, 6, 2, "#33210f");
+    } else {                                             // 空中姿势：前腿抬起后腿后蹬
+      px(x + 4, b + 25, 9, 9, O); px(x + 13, b + 25, 9, 9, O);
+      px(x + 5, b + 26, 7, 5, "#5a3a1a"); px(x + 3, b + 29, 6, 3, "#33210f");
+      px(x + 14, b + 26, 7, 5, "#6a4525"); px(x + 17, b + 29, 5, 3, "#33210f");
+    }
   }
 
   function drawEnemy(en) {
     if (en.dead) return;
     const x = Math.round(en.x), y = Math.round(en.y);
     if (en.fly) {
+      // ---- 蝙蝠：扇动双翼 + 黄眼獠牙 ----
       const f = Math.sin(tick * 0.25 + en.phase) * 5;
-      px(x + 10, y + 6, 12, 12, "#7a3fa0");
-      px(x + 12, y + 1, 8, 6, "#7a3fa0");
-      px(x + 12, y - 2, 3, 4, "#5a2a78"); px(x + 17, y - 2, 3, 4, "#5a2a78");
-      px(x + 13, y + 8, 3, 3, "#ffe98a"); px(x + 17, y + 8, 3, 3, "#ffe98a");
-      px(x, y + 4 + f, 10, 6, "#5a2a78"); px(x + 22, y + 4 - f, 10, 6, "#5a2a78");
+      ctx.fillStyle = "rgba(0,0,0,.15)";
+      ctx.beginPath(); ctx.ellipse(x + 15, y + 30, 9, 2.5, 0, 0, 7); ctx.fill();
+      const O = "#1c0f2a";
+      ctx.fillStyle = "#5a2a78";                           // 左翼
+      ctx.beginPath();
+      ctx.moveTo(x + 11, y + 8); ctx.lineTo(x + 1, y + 2 + f); ctx.lineTo(x - 4, y + 11 + f);
+      ctx.lineTo(x + 3, y + 13 + f * 0.6); ctx.lineTo(x + 10, y + 13); ctx.fill();
+      ctx.fillStyle = "#5a2a78";                           // 右翼
+      ctx.beginPath();
+      ctx.moveTo(x + 21, y + 8); ctx.lineTo(x + 31, y + 2 - f); ctx.lineTo(x + 36, y + 11 - f);
+      ctx.lineTo(x + 29, y + 13 - f * 0.6); ctx.lineTo(x + 22, y + 13); ctx.fill();
+      px(x + 10, y - 4, 3, 6, O); px(x + 19, y - 4, 3, 6, O);           // 耳朵
+      px(x + 10, y - 3, 2, 3, "#7a3fa0"); px(x + 20, y - 3, 2, 3, "#7a3fa0");
+      px(x + 7, y + 2, 18, 17, O);                                       // 身体描边
+      px(x + 8, y + 3, 16, 15, "#7a3fa0");
+      px(x + 8, y + 12, 16, 6, "#5a2a78");                               // 腹部阴影
+      px(x + 10, y + 6, 4, 4, "#ffe98a"); px(x + 18, y + 6, 4, 4, "#ffe98a");
+      px(x + 11, y + 7, 2, 2, "#6a5400"); px(x + 19, y + 7, 2, 2, "#6a5400");
+      px(x + 11, y + 13, 2, 3, "#ffffff"); px(x + 19, y + 13, 2, 3, "#ffffff");   // 獠牙
     } else {
-      const wob = (tick >> 4) % 2;
-      px(x + 2, y, 26, 18, "#8a4a2a");
-      px(x + 4, y - 4 + wob, 22, 6, "#a85a30");
-      px(x + 6, y + 4, 5, 5, "#fff"); px(x + 17, y + 4, 5, 5, "#fff");
-      px(x + 7, y + 5, 3, 3, "#111"); px(x + 18, y + 5, 3, 3, "#111");
-      px(x + 3, y + 18 + wob * 2, 8, 6, "#5a2a12");
-      px(x + 19, y + 18 - wob * 2 + 2, 8, 6, "#5a2a12");
+      // ---- 蘑菇怪：红帽白点 + 怒目小脚 ----
+      const wob = Math.sin(tick * 0.14 + en.x * 0.05) * 2;
+      ctx.fillStyle = "rgba(0,0,0,.22)";
+      ctx.beginPath(); ctx.ellipse(x + 15, y + 28, 13, 3.5, 0, 0, 7); ctx.fill();
+      const lp = Math.sin(tick * 0.2 + en.x * 0.09) * 3;   // 双脚交替
+      px(x + 3 + lp, y + 22, 10, 6, "#4a2c16"); px(x + 17 - lp, y + 22, 10, 6, "#3a2210");
+      px(x + 5, y + 9, 20, 15, "#f2e3c8");                              // 蘑菇柄
+      px(x + 5, y + 9, 20, 4, "#fff8ea");
+      px(x + 5, y + 20, 20, 4, "#dcc9a8");
+      px(x + 8, y + 13, 4, 5, "#2a1a12"); px(x + 18, y + 13, 4, 5, "#2a1a12");   // 眼
+      px(x + 7, y + 11, 6, 2, "#2a1a12"); px(x + 17, y + 11, 6, 2, "#2a1a12");   // 怒眉
+      px(x + 12, y + 19, 6, 2, "#b06a4a");                              // 嘴
+      px(x + 1, y - 3 + wob, 28, 14, "#8a2020");                        // 菌盖
+      px(x + 2, y - 2 + wob, 26, 11, "#d84040");
+      px(x + 4, y - 1 + wob, 12, 3, "#f06a6a");                         // 盖顶高光
+      px(x + 5, y + 3 + wob, 5, 5, "#fff4e8");                          // 白斑点
+      px(x + 17, y + 1 + wob, 4, 4, "#fff4e8");
+      px(x + 12, y + 6 + wob, 3, 3, "#ffd9d9");
+      px(x + 1, y + 9 + wob, 28, 2, "#a82828");                         // 盖沿
     }
   }
 
@@ -460,65 +582,125 @@
 
     for (const m of movers) {
       if (m.x + m.w < camX - 60 || m.x > camX + VIEW_W + 60) continue;
-      px(m.x, m.y, m.w, m.h, "#9aa4c0");
-      px(m.x, m.y, m.w, 4, "#d0d8ee");
-      px(m.x + 4, m.y + m.h - 6, 4, 4, "#5a6078"); px(m.x + m.w - 8, m.y + m.h - 6, 4, 4, "#5a6078");
+      px(m.x, m.y, m.w, m.h, "#3a4258");
+      px(m.x, m.y, m.w, 4, "#c8d4f0");
+      px(m.x, m.y, m.w, 7, "#8a96b8");
+      px(m.x, m.y + m.h - 3, m.w, 3, "#262c3e");
+      for (let i = 0; i < m.w - 8; i += 16) {           // 黄黑警示条
+        px(m.x + 4 + i, m.y + 9, 8, 4, "#e8b820");
+        px(m.x + 12 + i, m.y + 9, 8, 4, "#2a3040");
+      }
     }
 
     for (const s of solids) {
       if (s.x + s.w < camX - 60 || s.x > camX + VIEW_W + 60) continue;
       if (s.t === "ground") {
-        px(s.x, s.y, s.w, s.h, L.ground);
-        px(s.x, s.y, s.w, 6, L.ground === "#5a5a72" ? "#7a7a92" : shade(L.ground, 40));
-        px(s.x + 2, s.y + 8, 8, 6, L.dirt);
-        px(s.x + 22, s.y + 22, 8, 6, L.dirt);
+        px(s.x, s.y, s.w, s.h, L.dirt);
+        px(s.x + 6, s.y + 16, 5, 4, shade(L.dirt, -22));       // 土壤颗粒
+        px(s.x + 24, s.y + 28, 6, 4, shade(L.dirt, -22));
+        px(s.x + 15, s.y + 10, 4, 3, shade(L.dirt, 16));
+        px(s.x + 30, s.y + 20, 4, 3, shade(L.dirt, -16));
+        if (s.top) {
+          const g = L.ground;
+          px(s.x, s.y, s.w, 10, g);
+          px(s.x, s.y, s.w, 3, shade(g, 30));
+          px(s.x, s.y + 10, s.w, 2, shade(g, -34));
+          px(s.x + 5, s.y - 3, 2, 3, g);                       // 草叶/石笋尖
+          px(s.x + 14, s.y - 5, 2, 5, shade(g, 22));
+          px(s.x + 28, s.y - 4, 2, 4, g);
+        }
       } else if (s.t === "plat") {
-        px(s.x, s.y, s.w, s.h, L.brick);
-        px(s.x, s.y, s.w, 3, shade(L.brick, 50));
+        px(s.x, s.y, s.w, s.h, shade(L.brick, -50));
+        px(s.x + 1, s.y, s.w - 2, s.h - 2, L.brick);
+        px(s.x + 1, s.y, s.w - 2, 3, shade(L.brick, 50));
+        px(s.x + 1, s.y + s.h - 4, s.w - 2, 2, shade(L.brick, -36));
       } else if (s.t === "q") {
-        px(s.x, s.y, s.w, s.h, s.used ? "#7a6a3a" : "#e8b820");
-        px(s.x + 3, s.y + 3, s.w - 6, s.h - 6, s.used ? "#5a4a2a" : "#f8d860");
-        if (!s.used) { px(s.x + 16, s.y + 8, 8, 4, "#8a5a00"); px(s.x + 20, s.y + 10, 4, 8, "#8a5a00"); px(s.x + 16, s.y + 20, 8, 4, "#8a5a00"); px(s.x + 15, s.y + 24, 4, 4, "#8a5a00"); px(s.x + 21, s.y + 24, 4, 4, "#8a5a00"); }
+        if (s.used) {
+          px(s.x, s.y, s.w, s.h, "#4a4230");
+          px(s.x + 1, s.y + 1, s.w - 2, s.h - 2, "#6a5f42");
+          px(s.x + 1, s.y + 1, s.w - 2, 2, "#7d7154");
+        } else {
+          const gl = Math.sin(tick * 0.1) > 0;
+          px(s.x, s.y, s.w, s.h, "#8a5a00");
+          px(s.x + 1, s.y + 1, s.w - 2, s.h - 2, "#e8a820");
+          px(s.x + 1, s.y + 1, s.w - 2, 3, "#f8d860");
+          px(s.x + 3, s.y + 3, 3, 3, "#8a5a00"); px(s.x + s.w - 6, s.y + 3, 3, 3, "#8a5a00");
+          px(s.x + 3, s.y + s.h - 6, 3, 3, "#8a5a00"); px(s.x + s.w - 6, s.y + s.h - 6, 3, 3, "#8a5a00");
+          ctx.font = "bold 24px 'Courier New', monospace";
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillStyle = gl ? "#ffffff" : "#ffe98a";
+          ctx.fillText("?", s.x + s.w / 2, s.y + s.h / 2 + 1);
+          ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+        }
       } else if (s.t === "spring") {
         const sq = s.squash > 0 ? 8 : 0;
         if (s.squash > 0) s.squash--;
-        px(s.x + 2, s.y + 32, 36, 8, "#444");
-        px(s.x + 10, y8(s, 16) + sq, 20, 5, "#d03030");
-        px(s.x + 10, y8(s, 22) + sq * 0.5, 20, 5, "#d03030");
-        px(s.x + 10, y8(s, 28) + sq * 0.25, 20, 5, "#d03030");
-        px(s.x + 4, s.y + 8 + sq, 32, 6, "#f0f0f0");
+        px(s.x + 4, s.y + 34, 32, 6, "#3a3a46");              // 底座
+        px(s.x + 4, s.y + 34, 32, 2, "#5a5a6a");
+        px(s.x + 13, y8(s, 27) + sq, 14, 4, "#9aa4c0");       // 弹簧圈
+        px(s.x + 15, y8(s, 21) + sq * 0.66, 10, 4, "#8a94b0");
+        px(s.x + 13, y8(s, 15) + sq * 0.33, 14, 4, "#9aa4c0");
+        px(s.x + 6, y8(s, 8) + sq, 28, 7, "#e03030");         // 顶板
+        px(s.x + 6, y8(s, 8) + sq, 28, 2, "#ff7a7a");
+        px(s.x + 8, y8(s, 13) + sq, 24, 2, "#a01818");
       } else {
-        px(s.x, s.y, s.w, s.h, L.brick);
-        px(s.x, s.y, s.w, 3, shade(L.brick, 50));
-        px(s.x + 1, s.y + 20, s.w - 2, 2, shade(L.brick, -40));
+        px(s.x, s.y, s.w, s.h, shade(L.brick, -46));          // 砖块
+        px(s.x + 1, s.y + 1, s.w - 2, s.h - 2, L.brick);
+        px(s.x + 1, s.y + 1, s.w - 2, 3, shade(L.brick, 44));
+        px(s.x + 1, s.y + 19, s.w - 2, 2, shade(L.brick, -34));
+        px(s.x + 19, s.y + 1, 2, 18, shade(L.brick, -34));
+        px(s.x + 1, s.y + 37, s.w - 2, 2, shade(L.brick, -34));
+        px(s.x + 9, s.y + 21, 2, 16, shade(L.brick, -34));
+        px(s.x + 29, s.y + 21, 2, 16, shade(L.brick, -34));
       }
     }
+
+    for (const l of lava) {                                   // 岩浆（此前未绘制，补上）
+      if (l.x + l.w < camX - 60 || l.x > camX + VIEW_W + 60) continue;
+      const wob = Math.sin(tick * 0.07 + l.x * 0.045) * 2;
+      px(l.x, l.y + 3 + wob, l.w, TILE - 3 - wob, "#d43818");
+      px(l.x, l.y + 3 + wob, l.w, 5, "#ff8a2a");
+      px(l.x, l.y + 9 + wob, l.w, 2, "#ffd54a");
+      px(l.x, l.y + TILE - 6, l.w, 6, "#8a1c0c");
+      if ((tick + l.x) % 120 < 3) px(l.x + 8 + (l.x * 7 % 22), l.y - 1 + wob, 4, 4, "#ffb02a");
+    }
+
     for (const s of spikes) {
       for (let i = 0; i < 3; i++) {
         const bx = s.x + i * (s.w / 3);
-        ctx.fillStyle = "#cfd4e0";
+        ctx.fillStyle = "#78809a";
         ctx.beginPath();
-        ctx.moveTo(bx, s.y + s.h); ctx.lineTo(bx + s.w / 6, s.y); ctx.lineTo(bx + s.w / 3, s.y + s.h);
+        ctx.moveTo(bx - 1, s.y + s.h); ctx.lineTo(bx + s.w / 6, s.y - 1); ctx.lineTo(bx + s.w / 3 + 1, s.y + s.h);
+        ctx.fill();
+        ctx.fillStyle = "#d8dee8";
+        ctx.beginPath();
+        ctx.moveTo(bx + 1, s.y + s.h); ctx.lineTo(bx + s.w / 6, s.y + 1); ctx.lineTo(bx + s.w / 3 - 1, s.y + s.h);
         ctx.fill();
       }
     }
     for (const c of coins) {
       if (c.taken) continue;
       const spin = Math.abs(Math.cos(tick * 0.08)) * 10 + 4;
-      px(c.x - spin/2, c.y - 9, spin, 18, "#ffd700");
-      px(c.x - spin/2 + 2, c.y - 7, Math.max(2, spin - 4), 14, "#ffe98a");
+      ctx.fillStyle = "rgba(255,215,0,.22)";                  // 金币光晕
+      ctx.beginPath(); ctx.arc(c.x, c.y, 13, 0, 7); ctx.fill();
+      px(c.x - spin / 2, c.y - 9, spin, 18, "#e8a800");
+      px(c.x - spin / 2 + 1, c.y - 8, Math.max(2, spin - 2), 16, "#ffd700");
+      px(c.x - spin / 2 + 2, c.y - 6, Math.max(1, spin - 5), 9, "#fff3b0");
     }
     for (const en of enemies) drawEnemy(en);
     if (flag) {
       const fy = flag.y;
-      px(flag.x - 3, fy - TILE * 2.6, 6, TILE * 2.6, flagLocked ? "#6a6a7a" : "#c8c8c8");
+      px(flag.x - 6, fy - TILE * 2.6 - 7, 12, 7, flagLocked ? "#6a6a7a" : "#ffd700");   // 顶球
+      px(flag.x - 3, fy - TILE * 2.6, 6, TILE * 2.6, flagLocked ? "#5a5a6a" : "#e8e8f0");
+      px(flag.x - 3, fy - TILE * 2.6, 2, TILE * 2.6, flagLocked ? "#4a4a58" : "#ffffff");
       const wave = Math.sin(tick * 0.1) * 3;
-      ctx.fillStyle = flagLocked ? "#7a7a8a" : "#30d040";
+      ctx.fillStyle = flagLocked ? "#7a7a8a" : "#2ecc4e";
       ctx.beginPath();
-      ctx.moveTo(flag.x + 3, fy - TILE * 2.6);
-      ctx.lineTo(flag.x + 40 + wave, fy - TILE * 2.2);
-      ctx.lineTo(flag.x + 3, fy - TILE * 1.8);
+      ctx.moveTo(flag.x + 3, fy - TILE * 2.6 + 4);
+      ctx.lineTo(flag.x + 44 + wave, fy - TILE * 2.2 + 6);
+      ctx.lineTo(flag.x + 3, fy - TILE * 1.8 + 4);
       ctx.fill();
+      if (!flagLocked) px(flag.x + 9, fy - TILE * 2.28, 9, 9, "#ffffff");   // 旗徽
       if (flagLocked) {                              // 锁
         px(flag.x - 9, fy - 74, 18, 13, "#e8b820");
         ctx.strokeStyle = "#e8b820"; ctx.lineWidth = 3;
