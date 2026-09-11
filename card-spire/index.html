@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>尖塔构筑者 · Roguelike 卡牌构筑</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="app">
+  <header id="topbar"></header>
+  <main id="stage"></main>
+</div>
+<div id="modal"><div class="mbox" id="mbox"></div></div>
+<div id="toast"></div>
+
+<!-- 依赖顺序：工具 → 美术 → 结算器 → 数据（卡/遗物/敌人/事件） → 引擎 → 音效 → 界面 → 启动 -->
+<script src="js/utils.js"></script>
+<script src="js/art.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/cards.js"></script>
+<script src="js/relics.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/events.js"></script>
+<script src="js/sfx.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
