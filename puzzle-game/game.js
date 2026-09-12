@@ -530,6 +530,7 @@
 
   /* ================= 启动 ================= */
   solveBtn.hidden = true; // 数字模式无需预览
+  resetRound(); // 先初始化棋盘数据，否则 board 为空、滑块没有坐标会全部叠在左上角
   buildTiles();
   paint(state.board);
   refreshBest();
