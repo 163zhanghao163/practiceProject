@@ -13,6 +13,8 @@ const HEL = v => ({ op: 'heal', value: v });
 const ABF = (b, v) => ({ op: 'applyBuff', value: { buff: b, value: v } });
 const SBF = (b, v) => ({ op: 'selfBuff', value: { buff: b, value: v } });
 const MUL = (times, effect) => ({ op: 'multi', value: { times, effect } });
+const HPC = v => ({ op: 'hpCost', value: v });
+const DIS = v => ({ op: 'discard', value: v });
 
 /* --- 初始卡组 --- */
 C('strike', '打击', 1, 'attack', 'common', 'enemy', [DMG(6)]);
@@ -98,6 +100,38 @@ C('mirror_blade', '镜刃', 1, 'attack', 'rare', 'enemy', [MUL(2, DMG({ ref: 'bu
 C('poison_bomb', '毒爆', 2, 'attack', 'rare', 'all', [ABF('poison', 8)]);
 C('thousand_cuts', '千刀万剐', 2, 'attack', 'rare', 'enemy', [MUL(6, DMG(4))]);
 
+/* --- 新流派：血猎（吸血 / 血祭代价） --- */
+C('crimson_rite', '猩红仪式', 0, 'skill', 'common', 'self', [SBF('strength', 2), HPC(2)], { up: { vals: [1, 0] } });
+C('leeching_strike', '汲血打击', 1, 'attack', 'common', 'enemy', [DMG(5), HEL(2)], { up: { vals: [2, 1] } });
+C('vampiric_claw', '吸血之爪', 1, 'attack', 'uncommon', 'enemy', [DMG(7)], { lifesteal: true });
+C('blood_feast', '血腥盛宴', 2, 'attack', 'uncommon', 'all', [DMG(8)], { lifesteal: true });
+C('blood_surge', '血怒', 1, 'skill', 'rare', 'self', [HPC(4), ENR(2), SBF('strength', 2)], { exhaust: true, up: { vals: [0, 0, 1] } });
+C('vampiric_aura', '血族亲王', 2, 'power', 'rare', 'self', [SBF('vampiric', 1)], { up: { vals: [1] } });
+
+/* --- 新流派：虚空（弃牌 / 手牌协同） --- */
+C('void_touch', '虚空之触', 1, 'attack', 'common', 'enemy', [DMG(6), DIS(1)], { up: { vals: [3, 0] } });
+C('abyss_gaze', '深渊凝视', 0, 'skill', 'common', 'self', [DIS(1), DRW(2)], { up: { vals: [0, 1] } });
+C('void_burst', '虚空爆发', 1, 'attack', 'uncommon', 'enemy', [DMG({ ref: 'handCount', base: 2 }), DIS(1)], { up: { vals: [2, 0] } });
+C('oblivion_sweep', '湮灭横扫', 1, 'attack', 'uncommon', 'all', [DMG(5), DIS(1)]);
+C('night_pact', '暗夜契约', 0, 'skill', 'uncommon', 'self', [DIS(2), ENR(1)], { exhaust: true, up: { exhaust: false } });
+C('hunger_sigil', '饥饿印记', 1, 'power', 'uncommon', 'self', [SBF('hunger', 1)], { up: { vals: [1] } });
+C('void_flood', '虚空洪流', 2, 'attack', 'rare', 'enemy', [DMG({ ref: 'handCount', base: 3 }), DIS(3), DRW(3)], { up: { vals: [2, 0, 0] } });
+
+/* --- 荆棘流补强 --- */
+C('thorn_shield', '荆棘小盾', 1, 'skill', 'common', 'self', [BLK(5), SBF('thorns', 2)], { up: { vals: [2, 1] } });
+C('thorn_eruption', '荆棘爆发', 2, 'skill', 'rare', 'self', [BLK(10), SBF('thorns', 5)], { up: { vals: [3, 2] } });
+
+/* --- 各流派补强 --- */
+C('venom_spray', '毒液飞溅', 1, 'attack', 'common', 'all', [ABF('poison', 2)]);
+C('executioner', '刽子手', 1, 'attack', 'common', 'enemy', [DMG({ ref: 'targetLostHp', base: 6 })]);
+C('toxic_fang', '剧毒之牙', 1, 'attack', 'uncommon', 'enemy', [DMG(3), ABF('poison', 5)], { up: { vals: [0, 2] } });
+C('combo_storm', '连击风暴', 1, 'attack', 'uncommon', 'enemy', [MUL(5, DMG(3))]);
+C('rally', '集结号令', 2, 'skill', 'uncommon', 'all', [ABF('weak', 1), ABF('vulnerable', 1), BLK(6)], { up: { vals: [1, 1, 3] } });
+C('medic_kit', '战地急救', 1, 'skill', 'uncommon', 'self', [HEL(5), BLK(5)], { up: { vals: [3, 2] } });
+C('fortress_wall', '城墙', 2, 'skill', 'rare', 'self', [BLK(20), SBF('dexterity', 2)], { up: { vals: [5, 1] } });
+C('twin_moon', '双月斩', 1, 'attack', 'rare', 'enemy', [MUL(2, DMG(11))]);
+C('glass_cannon', '玻璃大炮', 2, 'attack', 'rare', 'enemy', [DMG(26), HPC(4)], { up: { vals: [4, 0] } });
+
 const CARD_BY_ID = {};
 for (const c of CARDS) CARD_BY_ID[c.id] = c;
 for (const c of CARDS) if (!c.desc) c.desc = describeCard(c);
@@ -113,6 +147,7 @@ function refLabel(v) {
     case 'targetVulnerable': return (v.base || 0) + '（目标易伤时 ×1.5）';
     case 'block': return '当前格挡' + (v.factor && v.factor !== 1 ? '×' + v.factor : '') + (v.base ? '+' + v.base : '');
     case 'targetLostHp': return (v.base || 0) + '+目标已损失生命';
+    case 'handCount': return (v.base || 0) + '+当前手牌数';
     default: return String(v.base || 0);
   }
 }
@@ -124,13 +159,17 @@ function describeCard(c) {
         case 'damage': {
           const a = refLabel(eff.value);
           const all = target === 'all';
-          parts.push((all ? '对所有敌人造成 ' : '造成 ') + a + ' 点伤害' + (eff.pierce || c.pierce ? '（无视格挡）' : ''));
+          parts.push((all ? '对所有敌人造成 ' : '造成 ') + a + ' 点伤害' +
+            (eff.pierce || c.pierce ? '（无视格挡）' : '') +
+            (eff.lifesteal || c.lifesteal ? '（吸血）' : ''));
           break;
         }
         case 'block': parts.push('获得 ' + refLabel(eff.value) + ' 点格挡'); break;
         case 'draw': parts.push('抽 ' + refLabel(eff.value) + ' 张牌'); break;
         case 'gainEnergy': parts.push('获得 ' + refLabel(eff.value) + ' 点能量'); break;
         case 'heal': parts.push('回复 ' + refLabel(eff.value) + ' 点生命'); break;
+        case 'hpCost': parts.push('失去 ' + refLabel(eff.value) + ' 点生命'); break;
+        case 'discard': parts.push('随机弃掉 ' + refLabel(eff.value) + ' 张手牌'); break;
         case 'applyBuff': {
           const b = BUFFS[eff.value.buff];
           const all = target === 'all';

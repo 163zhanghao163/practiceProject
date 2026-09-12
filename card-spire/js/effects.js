@@ -10,6 +10,7 @@ function resolve(v, ctx) {
     case 'targetVulnerable': return ctx.target && ctx.target.buffs.vulnerable ? Math.floor((v.base || 0) * 1.5) : (v.base || 0);
     case 'block': return Math.floor((ctx.self.block || 0) * (v.factor || 1)) + (v.base || 0);
     case 'targetLostHp': return (v.base || 0) + Math.max(0, (ctx.target ? ctx.target.maxHp - ctx.target.hp : 0));
+    case 'handCount': return (v.base || 0) + (G.b ? G.b.hand.length : 0);
     default: return v.base || 0;
   }
 }
@@ -24,13 +25,14 @@ function applyEffect(ctx, eff) {
 const OPERATORS = {
   damage: (ctx, v, eff) => {
     const pierce = !!(eff && eff.pierce) || !!(v && v.pierce) || !!(ctx.card && ctx.card.pierce);
+    const lifesteal = !!(eff && eff.lifesteal) || !!(ctx.card && ctx.card.lifesteal);
     const amt = resolve(v, ctx);
     if (ctx.card && ctx.card.target === 'all') {
-      for (const e of aliveEnemies()) dealDamage(ctx.self, e, amt, { pierce });
+      for (const e of aliveEnemies()) dealDamage(ctx.self, e, amt, { pierce, lifesteal });
     } else {
       let t = ctx.target;
       if (!t || t.hp <= 0) t = aliveEnemies()[0];
-      if (t) dealDamage(ctx.self, t, amt, { pierce });
+      if (t) dealDamage(ctx.self, t, amt, { pierce, lifesteal });
     }
   },
   block: (ctx, v) => {
@@ -59,6 +61,26 @@ const OPERATORS = {
     const times = resolve(v.times, ctx);
     for (let i = 0; i < times; i++) applyEffect(ctx, v.effect);
   },
+  // 血祭代价：扣自己的生命（不会低于 1，无法自杀）
+  hpCost: (ctx, v) => {
+    const amt = Math.min(resolve(v, ctx), Math.max(0, ctx.self.hp - 1));
+    if (amt > 0) {
+      ctx.self.hp -= amt;
+      FX.push({ host: hostOf(ctx.self), text: '-' + amt, cls: 'fdmg' });
+      SFX.play('hurt');
+    }
+  },
+  // 弃牌：随机弃掉手牌 n 张；若有「饥饿」buff，每弃一张获得 1 层力量
+  discard: (ctx, v) => {
+    const n = Math.min(resolve(v, ctx), G.b.hand.length);
+    for (let i = 0; i < n; i++) {
+      const idx = rand(G.b.hand.length);
+      const c = G.b.cardByUid[G.b.hand.splice(idx, 1)[0]];
+      G.b.discardPile.push(c.uid);
+      FX.push({ host: '#p-panel', text: '🗑' + c.name, cls: 'fdmg' });
+    }
+    if (n > 0 && ctx.self.buffs.hunger) addBuff(ctx.self, 'strength', n * ctx.self.buffs.hunger, 'player');
+  },
 };
 
 /* ---------------- 伤害 / 治疗 / Buff 结算 ---------------- */
@@ -80,6 +102,17 @@ function dealDamage(src, dst, base, opts = {}) {
     dst.hp = Math.max(0, dst.hp - toHp);
     FX.push({ host: hostOf(dst), text: '-' + toHp, cls: 'fdmg' });
     SFX.play(dst === G.b.p ? 'hurt' : 'attack');
+  }
+  // 吸血：卡牌自带 lifesteal 吸满额伤害，「吸血」buff 吸一半穿甲伤害
+  if (src === G.b.p && toHp > 0 && src.hp < src.maxHp) {
+    let heal = 0;
+    if (opts.lifesteal) heal += toHp;
+    if (src.buffs.vampiric) heal += Math.floor(toHp / 2);
+    if (heal > 0) {
+      heal = Math.min(heal, src.maxHp - src.hp);
+      src.hp += heal;
+      FX.push({ host: 'player', text: '🩸+' + heal, cls: 'fheal' });
+    }
   }
   if (dst.buffs.thorns && src && src.hp > 0 && src !== dst) {
     const t = dst.buffs.thorns;

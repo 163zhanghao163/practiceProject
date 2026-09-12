@@ -207,18 +207,67 @@ function runSelfTests() {
     for (let trial = 0; trial < 20; trial++) {
       for (const act of [1, 2, 3]) {
         const rows = genMap(act);
-        assert(rows.length === 9 && rows[8][0].t === 'boss', '首领行缺失');
-        for (let r = 0; r < 8; r++) {
+        const last = rows.length - 1;
+        assert(rows.length >= 7 && rows.length <= 10, '层数越界: ' + rows.length);
+        assert(rows[last][0].t === 'boss', '首领行缺失');
+        for (let r = 0; r < last; r++) {
           for (const n of rows[r]) assert(n.edges.length > 0, `第 ${r} 行存在死路节点`);
           rows[r].forEach((n, i) => n.edges.forEach(j =>
             assert(rows[r + 1][j] !== undefined, `第 ${r} 行节点边越界: ${i}->${j}`)));
         }
-        for (let r = 1; r < 9; r++) {
+        for (let r = 1; r <= last; r++) {
           rows[r].forEach((_, j) =>
             assert(rows[r - 1].some(n => n.edges.includes(j)), `第 ${r} 行节点 ${j} 不可达`));
         }
+        assert(rows.slice(0, last).some(row => row.some(n => n.t === 'rest')), '整幕无营地');
+        assert(rows[last - 1].some(n => n.t === 'rest'), 'Boss 前无营地');
+        assert(rows.slice(0, last).filter(row => row.some(n => n.t === 'treasure')).length <= 2, '宝箱房超上限');
       }
     }
+  });
+  t('吸血：造成伤害转化为生命', () => {
+    const e = mkBattle(['vampiric_claw'], 50);
+    G.b.p.hp = 30;
+    G.b.energy = 3; clearFx();
+    tryPlay(0, e);
+    assert(e.hp === 43, `敌人 HP=${e.hp}`);
+    assert(G.b.p.hp === 37, `玩家 HP=${G.b.p.hp}`);
+  });
+  t('吸血 buff：穿甲伤害的一半转化为生命', () => {
+    const e = mkBattle(['strike'], 50);
+    G.b.p.hp = 30; G.b.p.buffs.vampiric = 1;
+    G.b.energy = 3; clearFx();
+    tryPlay(0, e);
+    assert(G.b.p.hp === 33, `玩家 HP=${G.b.p.hp}`);
+  });
+  t('血祭代价：扣生命且不会低于 1', () => {
+    const e = mkBattle(['crimson_rite'], 50);
+    G.b.energy = 3; clearFx();
+    tryPlay(0, e);
+    assert(G.b.p.hp === 48, `玩家 HP=${G.b.p.hp}`);
+    assert(G.b.p.buffs.strength === 2, `力量=${G.b.p.buffs.strength}`);
+    const e2 = mkBattle(['crimson_rite'], 50);
+    G.b.p.hp = 2; G.b.energy = 3; clearFx();
+    tryPlay(0, e2);
+    assert(G.b.p.hp === 1, `残血钳制失败 HP=${G.b.p.hp}`);
+  });
+  t('弃牌与手牌协同：虚空爆发按手牌数加伤', () => {
+    const e = mkBattle(['void_burst', 'defend', 'defend'], 50);
+    G.b.hand = [G.deck[0].uid, G.deck[1].uid, G.deck[2].uid]; // 确定性手牌（startBattle 会洗牌）
+    G.b.drawPile = []; G.b.discardPile = [];
+    G.b.energy = 3; clearFx();
+    tryPlay(0, e);
+    assert(e.hp === 46, `伤害应为基础2+手牌2=4，实际 HP=${e.hp}`);
+    assert(G.b.hand.length === 1, `弃 1 张后手牌=${G.b.hand.length}`);
+  });
+  t('饥饿：每弃一张牌获得力量', () => {
+    mkBattle(['abyss_gaze', 'defend', 'defend', 'defend'], 50);
+    G.b.hand = [G.deck[0].uid, G.deck[1].uid, G.deck[2].uid, G.deck[3].uid];
+    G.b.drawPile = []; G.b.discardPile = [];
+    G.b.p.buffs.hunger = 2;
+    G.b.energy = 3; clearFx();
+    tryPlay(0, null);
+    assert(G.b.p.buffs.strength === 2, `力量=${G.b.p.buffs.strength}`);
   });
   G._testing = false;
   return T;

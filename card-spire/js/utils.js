@@ -23,4 +23,6 @@ const BUFFS = {
   growth:    { name: '蛮力', icon: '🔥', good: true,  desc: '每回合开始获得 X 层力量' },
   charge:    { name: '充能', icon: '⚡', good: true,  desc: '每回合开始额外获得 X 点能量' },
   barricade: { name: '壁垒', icon: '🏰', good: true,  desc: '格挡在回合开始不再清零' },
+  vampiric:  { name: '吸血', icon: '🦇', good: true,  desc: '攻击对生命造成的伤害有一半转化为自己的生命' },
+  hunger:    { name: '饥饿', icon: '🕳️', good: true,  desc: '每弃掉一张牌获得 X 层力量' },
 };

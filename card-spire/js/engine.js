@@ -281,30 +281,50 @@ async function startPlayerTurn() {
    地图生成（三幕，每幕 8 层 + Boss，分支路径）
    ================================================================ */
 function genMap(act) {
-  const ROWS = 8, rows = [];
+  const ROWS = 6 + rand(4);                       // 每幕 6-9 层随机，每局结构都不同
+  const rows = [];
   for (let r = 0; r < ROWS; r++) {
-    const n = r === 0 ? 3 : 2 + rand(3);
+    const n = r === 0 ? 2 + rand(2) : 2 + rand(4); // 首行 2-3 个节点，其余 2-5 个
     const row = [];
-    for (let i = 0; i < n; i++) {
-      let t = 'battle';
-      const roll = Math.random();
-      if (r > 0 && roll < 0.16) t = 'event';
-      else if (r >= 3 && roll < 0.27) t = 'elite';
-      else if (roll < 0.36) t = 'shop';
-      else if (roll < 0.47) t = 'rest';
-      row.push({ t, edges: [] });
-    }
+    for (let i = 0; i < n; i++) row.push({ t: 'battle', edges: [] });
     rows.push(row);
   }
+  // 节点类型：权重随机 + 约束（首行全战斗；精英不早于第 3 层且后半程更多；
+  // 商店/宝箱每幕上限 2 个；营地后半程更密集）
+  let shopCount = 0, restCount = 0, treasureCount = 0;
+  for (let r = 1; r < ROWS; r++) {
+    const late = r >= ROWS - 3;
+    for (const node of rows[r]) {
+      const roll = Math.random();
+      const eliteW = r >= 2 ? (late ? 0.20 : 0.10) : 0;
+      const restW = r >= 2 ? (late ? 0.22 : 0.12) : 0.04;
+      let t = 'battle';
+      if (roll < 0.13) t = 'event';
+      else if (roll < 0.21 && treasureCount < 2) { t = 'treasure'; treasureCount++; }
+      else if (roll < 0.21 + eliteW && r >= 2) t = 'elite';
+      else if (roll < 0.21 + eliteW + 0.09 && shopCount < 2) { t = 'shop'; shopCount++; }
+      else if (roll < 0.21 + eliteW + 0.09 + restW && restCount < 3) { t = 'rest'; restCount++; }
+      node.t = t;
+    }
+  }
+  // 约束：Boss 前最后一行必有一个营地；全图至少一个营地
+  if (!rows[ROWS - 1].some(n => n.t === 'rest')) choice(rows[ROWS - 1]).t = 'rest';
+  if (restCount === 0) choice(rows[Math.max(1, ROWS - 2 - rand(Math.max(1, ROWS - 3)))]).t = 'rest';
+  // 连边：每个节点连向下层基准列附近的 1-3 列（可跨 2 列交叉），路径更自然
   for (let r = 0; r < ROWS - 1; r++) {
     const cur = rows[r], nxt = rows[r + 1];
     cur.forEach((node, i) => {
       const p = cur.length > 1 ? i / (cur.length - 1) : 0.5;
       const base = clamp(Math.round(p * (nxt.length - 1)), 0, nxt.length - 1);
       const set = new Set([base]);
-      if (nxt.length > 1 && Math.random() < 0.55) set.add(clamp(base + (Math.random() < 0.5 ? -1 : 1), 0, nxt.length - 1));
+      const extra = 1 + (Math.random() < 0.4 ? 1 : 0);
+      for (let k = 0; k < extra; k++) {
+        const spread = 1 + rand(2);
+        set.add(clamp(base + (Math.random() < 0.5 ? -spread : spread), 0, nxt.length - 1));
+      }
       set.forEach(j => node.edges.push(j));
     });
+    // 兜底：保证下层每个节点都有入边（连通性）
     nxt.forEach((_, j) => {
       if (!cur.some(nd => nd.edges.includes(j))) {
         const src = cur[clamp(Math.round(j / Math.max(1, nxt.length - 1) * (cur.length - 1)), 0, cur.length - 1)];
@@ -317,8 +337,9 @@ function genMap(act) {
   rows[ROWS - 1].forEach(n => n.edges.push(0));
   return rows;
 }
-const NODE_ICON = { battle: '⚔️', elite: '👹', event: '❓', shop: '🛒', rest: '🔥', boss: '👑' };
-const NODE_NAME = { battle: '战斗', elite: '精英', event: '事件', shop: '商店', rest: '营地', boss: '首领' };
+
+const NODE_ICON = { battle: '⚔️', elite: '👹', event: '❓', shop: '🛒', rest: '🔥', treasure: '🎁', boss: '👑' };
+const NODE_NAME = { battle: '战斗', elite: '精英', event: '事件', shop: '商店', rest: '营地', treasure: '宝箱', boss: '首领' };
 
 function availNodes() {
   if (G.row < 0) return G.mapRows[0].map((_, i) => i);
@@ -334,6 +355,14 @@ function enterNode(r, i) {
   else if (node.t === 'shop') { genShop(); G.screen = 'shop'; render(); }
   else if (node.t === 'rest') { G.restDone = false; G.screen = 'rest'; render(); }
   else if (node.t === 'event') { G.curEvent = choice(EVENTS); G.evResult = null; G.screen = 'event'; render(); }
+  else if (node.t === 'treasure') {
+    const gold = randInt(25, 45);
+    G.gold += gold;
+    const rel = grantRandomRelic();
+    toast('🎁 宝箱：💰 +' + gold + (rel ? ' · 🟡 遗物「' + rel + '」' : ''));
+    completeNode();
+    return;
+  }
 }
 function completeNode() {
   if (G.curRow == null) { G.curRow = G.row; G.curPos = G.pos; } // 兜底：战斗未经理由 enterNode 进入时
