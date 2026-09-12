@@ -501,3 +501,47 @@ button, .modal { touch-action: manipulation; }
   .seg-btn, .diff-btn, .primary, .ghost { min-height: 40px; }
   .panel-caption, footer small { font-size: .72rem; }
 }
+
+/* ---- 正确吸附反馈与胜利闪光 ---- */
+.piece.snap-correct {
+  animation: snap-glow 0.5s ease;
+}
+
+@keyframes snap-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(68, 217, 154, 0.85);
+  }
+  60% {
+    box-shadow: 0 0 0 12px rgba(68, 217, 154, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(68, 217, 154, 0);
+  }
+}
+
+.board-frame.win-flash {
+  animation: board-flash 1s ease;
+}
+
+@keyframes board-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 214, 102, 0);
+  }
+  30% {
+    box-shadow: 0 0 34px 8px rgba(255, 214, 102, 0.55);
+  }
+  60% {
+    box-shadow: 0 0 18px 4px rgba(68, 217, 154, 0.4);
+  }
+}
+
+kbd {
+  background: #22243a;
+  border: 1px solid #4a4e6e;
+  border-radius: 4px;
+  padding: 0 5px;
+  font-family: inherit;
+  font-size: 12px;
+  color: #cfd3ff;
+}

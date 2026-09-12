@@ -126,9 +126,10 @@
     <div id="stick"><div id="stick-knob"></div></div>
   </div>
   <p id="hint">
-    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键 移动 · 攻击全自动 · 大地图作战，右上角小地图 ·
-    触屏设备：左下角摇杆移动<br />
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键 移动 · 攻击全自动 · <kbd>P</kbd>/<kbd>Esc</kbd> 暂停 · <kbd>M</kbd> 静音 ·
+    大地图作战，右上角小地图 · 触屏设备：左下角摇杆移动<br />
     两种模式：<b>⏱ 限时存活</b>（坚持 8 分钟获胜）与 <b>♾ 无尽刷分</b>（怪物越战越强，冲击纪录） ·
+    升级三选一天赋：<b>⚡链式闪电</b>、<b>🩸吸血</b>、环绕利刃、暴击…<br />
     怪物会掉落<b>道具护符</b>：💣炸弹 🧿磁暴 ❄冰冻 🛡护盾 🔥狂暴
   </p>
 <script>
@@ -150,7 +151,61 @@
   try { best = JSON.parse(localStorage.getItem(LS_BEST)) || null; } catch (e) { best = null; }
   let state = "title", time = 0, kills = 0, spawnT = 0, bossT = 0, shakeT = 0;
   let camX = 0, camY = 0;
-  let player, enemies, bullets, gems, hearts, items, parts, dmgTexts, choices, orbAng;
+  let player, enemies, bullets, gems, hearts, items, parts, dmgTexts, choices, orbAng, zaps;
+
+  // ---------- WebAudio 合成音效（零素材，游戏中按 M 静音） ----------
+  const SFX = (() => {
+    let ac = null, muted = false;
+    try { muted = localStorage.getItem("arena-muted") === "1"; } catch (e) { /* 隐私模式 */ }
+    function a() {
+      if (!ac) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) ac = new AC(); }
+      if (ac && ac.state === "suspended") ac.resume();
+      return ac;
+    }
+    function tone(freq, dur, type, vol, when = 0, slideTo = 0) {
+      const c = a(); if (!c || muted) return;
+      const t0 = c.currentTime + when;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t0);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t0 + dur);
+      g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      o.connect(g).connect(c.destination);
+      o.start(t0); o.stop(t0 + dur + 0.02);
+    }
+    function noise(dur, vol, when = 0) {
+      const c = a(); if (!c || muted) return;
+      const t0 = c.currentTime + when, n = Math.floor(c.sampleRate * dur);
+      const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+      const s = c.createBufferSource(); s.buffer = buf;
+      const g = c.createGain(); g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      s.connect(g).connect(c.destination); s.start(t0);
+    }
+    let last = {};                                        // 高频音效节流（毫秒）
+    function throttled(key, ms) {
+      const now = performance.now();
+      if (now - (last[key] || 0) < ms) return false;
+      last[key] = now; return true;
+    }
+    return {
+      get muted() { return muted; },
+      toggle() { muted = !muted; try { localStorage.setItem("arena-muted", muted ? "1" : "0"); } catch (e) { /* 隐私模式 */ } return muted; },
+      shoot() { if (throttled("s", 70)) tone(680, 0.06, "sawtooth", 0.035, 0, 240); },
+      kill()  { if (throttled("k", 50)) { noise(0.08, 0.12); tone(300, 0.09, "triangle", 0.07, 0, 110); } },
+      gem()   { if (throttled("g", 60)) tone(920, 0.07, "square", 0.045, 0, 1350); },
+      heal()  { tone(520, 0.1, "sine", 0.08); tone(780, 0.14, "sine", 0.08, 0.07); },
+      levelup() { [660, 880, 1320].forEach((f, i) => tone(f, 0.13, "square", 0.07, i * 0.08)); },
+      pick()  { tone(740, 0.08, "square", 0.07); tone(1108, 0.11, "square", 0.06, 0.06); },
+      hurt()  { tone(200, 0.16, "sawtooth", 0.1, 0, 70); noise(0.1, 0.09); },
+      item()  { [880, 1108, 1479].forEach((f, i) => tone(f, 0.1, "square", 0.07, i * 0.06)); },
+      boss()  { tone(110, 0.4, "sawtooth", 0.12, 0, 82); tone(112, 0.4, "square", 0.06, 0.05, 80); },
+      zap()   { if (throttled("z", 45)) { noise(0.05, 0.08); tone(1600, 0.06, "square", 0.04, 0, 380); } },
+      win()   { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.16, "square", 0.08, i * 0.11)); },
+      lose()  { [392, 311, 262, 196].forEach((f, i) => tone(f, 0.22, "triangle", 0.1, i * 0.14)); },
+    };
+  })();
 
   const keys = {};
   document.addEventListener("keydown", e => {
@@ -162,9 +217,18 @@
     } else if (state === "gameover" || state === "win") {
       if (e.key === "Enter" || e.key === " ") startRun(mode);
       if (k === "m") showMenu();
+    } else if (state === "play" || state === "pause") {
+      if (k === "p" || e.key === "Escape") {              // 暂停 / 继续
+        state = state === "play" ? "pause" : "play";
+        SFX.pick();
+      }
+      if (k === "m") setMuteMsg();
     }
     if (state === "levelup" && ["1", "2", "3"].includes(k)) pick(+k - 1);
   });
+  function setMuteMsg() {
+    dmgTexts.push({ x: player.x, y: player.y - 40, t: SFX.toggle() ? "🔇 已静音" : "🔊 声音开启", col: "#cfd3ff", life: 55 });
+  }
   document.addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
 
   // ---------- 触屏虚拟摇杆 ----------
@@ -219,8 +283,9 @@
       magnet: 55, regen: 0, crit: 0.05,
       orbN: 0, orbDmg: 12, orbR: 62, orbSpd: 0.055,
       shieldT: 0, freezeT: 0, rageT: 0,
+      chain: 0, leech: 0,
     };
-    enemies = []; bullets = []; gems = []; hearts = []; items = []; parts = []; dmgTexts = [];
+    enemies = []; bullets = []; gems = []; hearts = []; items = []; parts = []; dmgTexts = []; zaps = [];
     time = 0; kills = 0; spawnT = 0; bossT = 7200; shakeT = 0; orbAng = 0;
     camX = Math.max(0, Math.min(WORLD_W - VIEW_W, player.x - VIEW_W / 2));
     camY = Math.max(0, Math.min(WORLD_H - VIEW_H, player.y - VIEW_H / 2));
@@ -236,6 +301,7 @@
   }
   function endRun() {
     state = "gameover";
+    SFX.lose();
     afterEl.style.display = "flex";
     if (mode === "endless" && (!best || kills > best.kills)) {
       best = { kills, time: Math.floor(time) };
@@ -256,9 +322,12 @@
     { ic: "💚", n: "再生", d: "每秒回复 1.5 点生命", ok: p => p.regen < 8, ap: p => p.regen += 1.5 },
     { ic: "🧲", n: "磁力护符", d: "拾取范围 +50%", ok: p => p.magnet < 300, ap: p => p.magnet *= 1.5 },
     { ic: "💥", n: "会心一击", d: "暴击率 +12%（2.5 倍伤害）", ok: p => p.crit < 0.6, ap: p => p.crit += 0.12 },
+    { ic: "⚡", n: "链式闪电", d: "子弹命中引发连锁闪电，可叠加 3 层", ok: p => p.chain < 3, ap: p => p.chain++ },
+    { ic: "🩸", n: "吸血之刃", d: "每次击杀回复 3×层数 生命", ok: p => p.leech < 3, ap: p => p.leech++ },
   ];
   function showLevelUp() {
     state = "levelup";
+    SFX.levelup();
     const pool = POOL.filter(u => u.ok(player));
     choices = [];
     while (choices.length < 3 && pool.length) {
@@ -276,6 +345,7 @@
   function pick(i) {
     if (state !== "levelup" || !choices[i]) return;
     choices[i].ap(player);
+    SFX.pick();
     state = "play";
     luEl.style.display = "none";
   }
@@ -294,6 +364,7 @@
   }
   function applyItem(it) {
     const p = player;
+    SFX.item();
     if (it.type === "bomb") {
       shakeT = 16;
       for (const e of enemies) if (!e.dead) { burst(e.x, e.y, "#ff9a3d", 6); hitEnemy(e, 100, false); }
@@ -355,13 +426,13 @@
   function dist2(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return dx * dx + dy * dy; }
 
   function update() {
+    if (state === "pause") return;                       // 暂停：连特效一起冻结
     if (state === "title" || state === "gameover" || state === "win" || state === "levelup") {
-      if (state === "levelup") {} // 暂停
       tickFx();
       return;
     }
     time += 1 / 60;
-    if (mode === "timed" && time >= WIN_TIME) { state = "win"; afterEl.style.display = "flex"; return; }
+    if (mode === "timed" && time >= WIN_TIME) { state = "win"; SFX.win(); afterEl.style.display = "flex"; return; }
 
     const p = player;
     // 移动（整个大世界范围）
@@ -385,6 +456,7 @@
       for (const e of enemies) { const d = dist2(p, e); if (d < bd) { bd = d; best = e; } }
       if (best && bd < 480 * 480) {
         p.cd = p.rate;
+        SFX.shoot();
         const base = Math.atan2(best.y - p.y, best.x - p.x);
         for (let i = 0; i < p.shots; i++) {
           const spread = (i - (p.shots - 1) / 2) * 0.16;
@@ -421,6 +493,7 @@
         if (Math.abs(e.x - b.x) < e.w / 2 + 5 && Math.abs(e.y - b.y) < e.h / 2 + 5) {
           hitEnemy(e, p.dmg, true);
           (b.hitSet = b.hitSet || new Set()).add(e);
+          if (p.chain && Math.random() < 0.22 * p.chain) chainZap(e, p.dmg * 0.6, p.chain);
           if (b.pierce-- <= 0) b.dead = true;
         }
       }
@@ -432,7 +505,7 @@
     spawnT--;
     if (spawnT <= 0) { spawnWave(); spawnT = Math.max(mode === "endless" ? 22 : 40, 110 - time * 0.16); }
     bossT--;
-    if (bossT <= 0) { spawnEnemy("boss"); bossT = 7200; shakeT = 20; }  // 每 2 分钟一个精英
+    if (bossT <= 0) { spawnEnemy("boss"); bossT = 7200; shakeT = 20; SFX.boss(); }  // 每 2 分钟一个精英
 
     // 敌人移动 + 分离 + 接触伤害
     p.iframes = p.iframes || 0;
@@ -446,6 +519,7 @@
       e.x += (dx / d) * e.spd; e.y += (dy / d) * e.spd;
       if (d < (e.w + p.w) / 2 - 2 && p.iframes <= 0 && p.shieldT <= 0) {
         p.hp -= e.dmg; p.iframes = 30; shakeT = 8;
+        SFX.hurt();
         burst(p.x, p.y, "#ff6b6b", 8);
         if (p.hp <= 0) endRun();
       }
@@ -470,13 +544,13 @@
     for (const g of gems) {
       const d = Math.hypot(p.x - g.x, p.y - g.y);
       if (d < p.magnet) { g.x += (p.x - g.x) / d * 5; g.y += (p.y - g.y) / d * 5; }
-      if (d < 14) { g.dead = true; gainXp(g.v); }
+      if (d < 14) { g.dead = true; SFX.gem(); gainXp(g.v); }
     }
     gems = gems.filter(g => !g.dead);
     for (const h of hearts) {
       const d = Math.hypot(p.x - h.x, p.y - h.y);
       if (d < p.magnet) { h.x += (p.x - h.x) / d * 5; h.y += (p.y - h.y) / d * 5; }
-      if (d < 14) { h.dead = true; p.hp = Math.min(p.maxhp, p.hp + 25); dmgTexts.push({ x: p.x, y: p.y - 24, t: "+25", col: "#7fff7f", life: 50 }); }
+      if (d < 14) { h.dead = true; SFX.heal(); p.hp = Math.min(p.maxhp, p.hp + 25); dmgTexts.push({ x: p.x, y: p.y - 24, t: "+25", col: "#7fff7f", life: 50 }); }
     }
     hearts = hearts.filter(h => !h.dead);
 
@@ -491,6 +565,26 @@
     tickFx();
   }
 
+  // 链式闪电：从命中的敌人逐跳弹向附近敌人
+  function chainZap(from, dmg, hops) {
+    let src = from;
+    const hitSet = new Set([from]);
+    for (let h = 0; h < hops; h++) {
+      let best = null, bd = 150 * 150;
+      for (const e of enemies) {
+        if (e.dead || hitSet.has(e)) continue;
+        const d = dist2(src, e);
+        if (d < bd) { bd = d; best = e; }
+      }
+      if (!best) break;
+      zaps.push({ x1: src.x, y1: src.y, x2: best.x, y2: best.y, life: 9 });
+      SFX.zap();
+      hitEnemy(best, dmg, false);
+      hitSet.add(best);
+      src = best;
+      dmg *= 0.7;
+    }
+  }
   function hitEnemy(e, dmg, canCrit) {
     let d = dmg;
     if (player.rageT > 0) d *= 2;
@@ -500,7 +594,13 @@
     burst(e.x, e.y, "#fff", 3);
     if (e.hp <= 0 && !e.dead) {
       e.dead = 1; kills++;
+      SFX.kill();
       burst(e.x, e.y, TYPES[e.type].col, 12);
+      if (player.leech) {                                // 吸血：击杀回血
+        const heal = 3 * player.leech;
+        player.hp = Math.min(player.maxhp, player.hp + heal);
+        dmgTexts.push({ x: player.x + (Math.random() * 12 - 6), y: player.y - 26, t: "+" + heal, col: "#7fff7f", life: 26 });
+      }
       const n = e.type === "boss" ? 8 : 1;
       for (let i = 0; i < n; i++) gems.push({ x: e.x + (Math.random() * 24 - 12), y: e.y + (Math.random() * 24 - 12), v: e.type === "boss" ? 6 : e.xp });
       if (e.type === "boss" || Math.random() < 0.04) hearts.push({ x: e.x, y: e.y });
@@ -528,6 +628,8 @@
     parts = parts.filter(pt => pt.life > 0);
     for (const d of dmgTexts) { d.y -= 0.7; d.life--; }
     dmgTexts = dmgTexts.filter(d => d.life > 0);
+    for (const z of zaps) z.life--;
+    zaps = zaps.filter(z => z.life > 0);
     if (shakeT > 0) shakeT--;
   }
 
@@ -756,6 +858,18 @@
     }
 
     for (const pt of parts) px(pt.x - 1, pt.y - 1, 3, 3, pt.col);
+    ctx.lineWidth = 2;                                   // 连锁闪电（折线闪光）
+    for (const z of zaps) {
+      ctx.globalAlpha = Math.min(1, z.life / 5);
+      ctx.strokeStyle = "#cfeeff";
+      ctx.beginPath();
+      ctx.moveTo(z.x1, z.y1);
+      ctx.lineTo((z.x1 + z.x2) / 2 + (Math.random() * 30 - 15), (z.y1 + z.y2) / 2 + (Math.random() * 30 - 15));
+      ctx.lineTo(z.x2, z.y2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
     ctx.font = "bold 12px 'Courier New', monospace";
     for (const d of dmgTexts) {
       ctx.fillStyle = d.col; ctx.globalAlpha = Math.min(1, d.life / 20);
@@ -771,6 +885,18 @@
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
     if (state !== "title") drawHud();
+    if (state === "pause") {                             // 暂停遮罩
+      ctx.fillStyle = "rgba(8,8,20,.55)";
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      ctx.textAlign = "center";
+      ctx.font = "bold 38px 'Courier New', monospace";
+      ctx.fillStyle = "#ffe98a";
+      ctx.fillText("⏸ 已暂停", VIEW_W / 2, VIEW_H / 2 - 8);
+      ctx.font = "17px 'Courier New', monospace";
+      ctx.fillStyle = "#cfd3ff";
+      ctx.fillText("按 P / Esc 继续作战 · M 静音", VIEW_W / 2, VIEW_H / 2 + 30);
+      ctx.textAlign = "left";
+    }
     if (state === "title" || state === "gameover" || state === "win") overlay();
   }
 

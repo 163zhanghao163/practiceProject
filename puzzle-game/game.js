@@ -48,10 +48,41 @@
   const fileInput = $("fileInput");
   const shuffleBtn = $("shuffleBtn");
   const solveBtn = $("solveBtn");
+  const undoBtn = $("undoBtn");
   const srcDefaultBtn = $("srcDefault");
   const srcCustomBtn = $("srcCustom");
 
-  let tiles = []; // 与棋盘位置一一对应的 tile 元素（只创建一次）
+  let tiles = new Map(); // 拼块号 -> tile 元素（每个拼块固定一个元素，滑动靠 transform 过渡）
+  let holeEl = null; // 空格虚线占位框
+  let history = []; // 悔棋历史：{board, emptyPos} 快照栈
+
+  /* ================= 音效（WebAudio 合成，M 键静音） ================= */
+  const SFX = (() => {
+    let ac = null, muted = false;
+    try { muted = localStorage.getItem("puzzle-muted") === "1"; } catch (_) { muted = false; }
+    function a() {
+      if (!ac) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) ac = new AC(); }
+      if (ac && ac.state === "suspended") ac.resume();
+      return ac;
+    }
+    function tone(freq, dur, type, vol, when = 0, slideTo = 0) {
+      const c = a(); if (!c || muted) return;
+      const t0 = c.currentTime + when;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t0);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t0 + dur);
+      g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      o.connect(g).connect(c.destination);
+      o.start(t0); o.stop(t0 + dur + 0.02);
+    }
+    return {
+      get muted() { return muted; },
+      toggle() { muted = !muted; try { localStorage.setItem("puzzle-muted", muted ? "1" : "0"); } catch (_) {} return muted; },
+      slide(back) { tone(back ? 190 : 230 + Math.random() * 50, 0.07, "triangle", 0.09, 0, back ? 120 : 150); },
+      win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, "square", 0.08, i * 0.09)); },
+    };
+  })();
 
   /* ================= 小工具 ================= */
   const cellCount = () => state.size * state.size;
@@ -142,31 +173,31 @@
   function buildTiles() {
     boardEl.style.setProperty("--size", state.size);
     boardEl.innerHTML = "";
-    tiles = [];
+    tiles = new Map();
     const n = cellCount();
     const frag = document.createDocumentFragment();
-    for (let pos = 0; pos < n; pos++) {
+    for (let tile = 1; tile < n; tile++) {
       const el = document.createElement("div");
       el.className = "tile";
-      el.dataset.pos = String(pos);
+      el.dataset.tile = String(tile);
+      tiles.set(tile, el);
       frag.appendChild(el);
-      tiles.push(el);
     }
+    holeEl = document.createElement("div");
+    holeEl.className = "hole";
+    frag.appendChild(holeEl);
     boardEl.appendChild(frag);
   }
 
-  // 就地更新所有格子（不重建 DOM）
+  // 就地更新所有拼块位置（改 --c/--r 触发 transform 滑动过渡）
   function paint(arr) {
     const imgMode = state.mode === "image";
     for (let pos = 0; pos < arr.length; pos++) {
-      const el = tiles[pos];
       const tile = arr[pos];
-      if (tile === 0) {
-        el.className = "tile empty";
-        el.style.backgroundImage = "";
-        el.textContent = "";
-        continue;
-      }
+      if (tile === 0) continue;
+      const el = tiles.get(tile);
+      el.style.setProperty("--c", String(pos % state.size));
+      el.style.setProperty("--r", String((pos / state.size) | 0));
       const movable = state.playing && !state.previewing && isMovable(pos);
       let cls = "tile";
       if (imgMode) {
@@ -180,8 +211,15 @@
       if (movable) cls += " movable";
       el.className = cls;
     }
+    holeEl.style.setProperty("--c", String(state.emptyPos % state.size));
+    holeEl.style.setProperty("--r", String((state.emptyPos / state.size) | 0));
     // 仅在进行中的游戏达成目标时点亮完成描边
     boardEl.classList.toggle("done", state.playing && isSolvedArr(arr));
+    updateUndo();
+  }
+
+  function updateUndo() {
+    undoBtn.disabled = !state.playing || state.previewing || history.length === 0;
   }
 
   /* ================= 交互 ================= */
@@ -189,6 +227,7 @@
     if (!state.playing || state.previewing || state.loading) return false;
     if (pos === state.emptyPos || !isMovable(pos)) return false;
 
+    history.push({ board: state.board.slice(), emptyPos: state.emptyPos });
     state.board[state.emptyPos] = state.board[pos];
     state.board[pos] = 0;
     state.emptyPos = pos;
@@ -197,22 +236,42 @@
     setMoves();
     if (!state.timerId) startTimer(); // 首次有效移动才开始计时
 
+    SFX.slide(false);
     paint(state.board);
     if (isSolved()) win();
     return true;
   }
 
-  // 事件委托：棋盘上只挂一个监听器
+  // 悔棋：恢复上一步棋盘（步数 +1 作为代价，防止刷最佳步数）
+  function undo() {
+    if (!state.playing || state.previewing || state.loading || !history.length) return;
+    const h = history.pop();
+    state.board = h.board;
+    state.emptyPos = h.emptyPos;
+    state.moves++;
+    setMoves();
+    SFX.slide(true);
+    paint(state.board);
+  }
+
+  // 事件委托：棋盘上只挂一个监听器（拼块元素按拼块号索引）
   boardEl.addEventListener("click", (e) => {
     const t = e.target.closest(".tile");
-    if (t) attemptMove(Number(t.dataset.pos));
+    if (t) attemptMove(state.board.indexOf(Number(t.dataset.tile)));
   });
 
-  // 方向键：把空格对应方向上的方块滑入空格
+  // 方向键：把空格对应方向上的方块滑入空格；Z 悔棋；M 静音
   window.addEventListener("keydown", (e) => {
     const delta = { ArrowUp: state.size, ArrowDown: -state.size, ArrowLeft: 1, ArrowRight: -1 }[e.key];
-    if (delta === undefined) return;
-    if (attemptMove(state.emptyPos + delta)) e.preventDefault();
+    if (delta !== undefined) {
+      if (attemptMove(state.emptyPos + delta)) e.preventDefault();
+      return;
+    }
+    if (e.key === "z" || e.key === "Z") undo();
+    if (e.key === "m" || e.key === "M") {
+      SFX.toggle();
+      shuffleBtn.title = SFX.muted ? "已静音" : "";
+    }
   });
 
   /* ================= 计时 ================= */
@@ -241,8 +300,11 @@
     const sec = getElapsedSec();
     setTime(sec);
     saveBest(state.moves, sec);
+    SFX.win();
+    boardEl.classList.add("win");                       // 对角线波次脉冲
+    setTimeout(() => boardEl.classList.remove("win"), 750);
     resultText.textContent = `用时 ${fmtTime(sec)}，共 ${state.moves} 步。`;
-    setTimeout(() => overlay.classList.remove("hidden"), 350);
+    setTimeout(() => overlay.classList.remove("hidden"), 650);
   }
 
   /* ================= 开局 / 重置 ================= */
@@ -262,6 +324,8 @@
     setTime(0);
     state.moves = 0;
     setMoves();
+    history = [];
+    boardEl.classList.remove("win");
     state.board = solvedBoard();
     state.emptyPos = cellCount() - 1;
   }
@@ -301,10 +365,15 @@
     state.moves = 0;
     setMoves();
     state.playing = true;
+    history = [];
     stopTimer();
     state.startTime = null;
     setTime(0);
+    boardEl.classList.add("no-anim"); // 随机游走过程不做滑动动画
     paint(state.board);
+    // 强制回流使禁用动画生效后立即恢复（双 rAF 在后台标签页可能被节流不触发）
+    void boardEl.offsetWidth;
+    boardEl.classList.remove("no-anim");
   }
 
   /* ================= 图片切割 ================= */
@@ -452,6 +521,7 @@
   });
 
   shuffleBtn.addEventListener("click", scramble);
+  undoBtn.addEventListener("click", undo);
 
   $("playAgain").addEventListener("click", () => {
     overlay.classList.add("hidden");

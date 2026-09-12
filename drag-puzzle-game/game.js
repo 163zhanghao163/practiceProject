@@ -46,6 +46,51 @@
     );
   const TIMER_TICK_MS = 250;
 
+  /* ================= 音效（WebAudio 合成，M 键静音） ================= */
+  const SFX = (() => {
+    let ac = null, muted = false;
+    try { muted = localStorage.getItem("drag-muted") === "1"; } catch (_) { muted = false; }
+    function a() {
+      if (!ac) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) ac = new AC(); }
+      if (ac && ac.state === "suspended") ac.resume();
+      return ac;
+    }
+    function tone(freq, dur, type, vol, when = 0, slideTo = 0) {
+      const c = a(); if (!c || muted) return;
+      const t0 = c.currentTime + when;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t0);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t0 + dur);
+      g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      o.connect(g).connect(c.destination);
+      o.start(t0); o.stop(t0 + dur + 0.02);
+    }
+    function noise(dur, vol, when = 0) {
+      const c = a(); if (!c || muted) return;
+      const t0 = c.currentTime + when, n = Math.floor(c.sampleRate * dur);
+      const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+      const s = c.createBufferSource(); s.buffer = buf;
+      const g = c.createGain(); g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      s.connect(g).connect(c.destination); s.start(t0);
+    }
+    return {
+      get muted() { return muted; },
+      toggle() { muted = !muted; try { localStorage.setItem("drag-muted", muted ? "1" : "0"); } catch (_) {} return muted; },
+      grab() { tone(340, 0.05, "triangle", 0.06); },
+      drop() { tone(150, 0.08, "triangle", 0.11, 0, 90); noise(0.04, 0.06); },
+      back() { tone(300, 0.08, "sine", 0.05, 0, 180); },
+      snap(done, total) {                                     // 正确吸附：音高随完成度上升
+        const p = total > 1 ? done / (total - 1) : 1;
+        tone(520 + p * 480, 0.1, "square", 0.08);
+        tone((520 + p * 480) * 1.5, 0.14, "square", 0.05, 0.05);
+      },
+      win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.15, "square", 0.08, i * 0.09)); },
+    };
+  })();
+
   /* ================= 状态 ================= */
   const state = {
     size: 4,
@@ -235,9 +280,12 @@
     const sec = getElapsedSec();
     setTime(sec);
     saveBest(state.moves, sec);
+    SFX.win();
+    boardFrame.classList.add("win-flash");               // 棋盘庆祝闪光
+    setTimeout(() => boardFrame.classList.remove("win-flash"), 1000);
     resultText.textContent = `难度 ${state.size}×${state.size} · 用时 ${fmtTime(sec)} · 共 ${state.moves} 步`;
     renderBoard(); // 关闭底图提示、点亮全部完成描边
-    setTimeout(() => winOverlay.classList.remove("hidden"), 300);
+    setTimeout(() => winOverlay.classList.remove("hidden"), 500);
   }
 
   /* ================= 图片切割 ================= */
@@ -361,6 +409,7 @@
     srcEl.classList.add("dragging");
     drag = { pid, from, ghost, srcEl };
     moveGhost(e.clientX, e.clientY);
+    SFX.grab();
   }
 
   function endDrag() {
@@ -409,6 +458,11 @@
 
   window.addEventListener("pointercancel", endDrag);
 
+  // M 键静音
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "m" || e.key === "M") SFX.toggle();
+  });
+
   trayEl.addEventListener("pointerdown", onPointerDown);
   boardEl.addEventListener("pointerdown", onPointerDown);
 
@@ -450,9 +504,22 @@
     }
     state.moves++;
     setMoves();
+    const snapped =
+      hit && hit.type === "cell" && state.cells[hit.idx] === info.pid && info.pid === hit.idx;
     renderBoard();
     renderTray();
     updateProgress();
+    if (snapped) {
+      // 正确吸附：上升音高 + 绿色光环
+      SFX.snap(correctCount(), cellCount());
+      const cell = boardEl.children[hit.idx];
+      const el = cell && cell.firstChild;
+      if (el) {
+        el.classList.add("snap-correct");
+        setTimeout(() => el.classList.remove("snap-correct"), 520);
+      }
+    } else if (hit && hit.type === "cell") SFX.drop();
+    else SFX.back();
     if (correctCount() === cellCount()) finish();
   }
 
