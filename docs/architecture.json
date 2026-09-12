@@ -1,0 +1,329 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "practiceProject · 纯前端游戏合集架构",
+    "locale": "zh-CN",
+    "output": "docs/architecture.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "main-path",
+        "label": "访问主路径",
+        "focus": [
+          "visitor",
+          "pages",
+          "hub"
+        ],
+        "note": "访客经 GitHub Pages 直接进入游戏大厅，全程无后端。"
+      },
+      {
+        "id": "games",
+        "label": "游戏矩阵",
+        "focus": [
+          "cardspire",
+          "roguearena",
+          "pixeladv",
+          "token",
+          "dragpuzzle",
+          "puzzle"
+        ],
+        "note": "六款游戏各自独立目录，互不依赖。"
+      },
+      {
+        "id": "saves",
+        "label": "本地存档",
+        "focus": [
+          "cardspire",
+          "roguearena",
+          "token",
+          "dragpuzzle",
+          "puzzle",
+          "storage"
+        ],
+        "note": "五款游戏把进度与记录写入浏览器 localStorage。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "visitor",
+      "type": "external",
+      "label": "访客",
+      "sublabel": "浏览器直接访问",
+      "pos": [
+        40,
+        60
+      ],
+      "size": [
+        130,
+        60
+      ]
+    },
+    {
+      "id": "pages",
+      "type": "cloud",
+      "label": "GitHub Pages",
+      "sublabel": "main 分支自动部署",
+      "pos": [
+        230,
+        58
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "hub",
+      "type": "frontend",
+      "label": "index.html · 游戏大厅",
+      "sublabel": "六款游戏统一入口",
+      "pos": [
+        657,
+        54
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "tag": "入口"
+    },
+    {
+      "id": "cardspire",
+      "type": "frontend",
+      "label": "尖塔构筑者",
+      "sublabel": "Roguelike 卡牌构筑",
+      "pos": [
+        194,
+        320
+      ],
+      "size": [
+        176,
+        72
+      ],
+      "tag": "76 卡 · 23 遗物"
+    },
+    {
+      "id": "roguearena",
+      "type": "frontend",
+      "label": "像素勇者 · 怪物围城",
+      "sublabel": "像素竞技生存",
+      "pos": [
+        382,
+        320
+      ],
+      "size": [
+        176,
+        72
+      ]
+    },
+    {
+      "id": "pixeladv",
+      "type": "frontend",
+      "label": "像素大冒险",
+      "sublabel": "像素动作闯关",
+      "pos": [
+        570,
+        320
+      ],
+      "size": [
+        176,
+        72
+      ]
+    },
+    {
+      "id": "token",
+      "type": "frontend",
+      "label": "Token 用量统计",
+      "sublabel": "开发辅助工具",
+      "pos": [
+        758,
+        320
+      ],
+      "size": [
+        176,
+        72
+      ]
+    },
+    {
+      "id": "dragpuzzle",
+      "type": "frontend",
+      "label": "拖拽拼图",
+      "sublabel": "图片拖放拼图",
+      "pos": [
+        946,
+        320
+      ],
+      "size": [
+        176,
+        72
+      ]
+    },
+    {
+      "id": "puzzle",
+      "type": "frontend",
+      "label": "拼图小游戏",
+      "sublabel": "经典滑块拼图",
+      "pos": [
+        1134,
+        320
+      ],
+      "size": [
+        176,
+        72
+      ]
+    },
+    {
+      "id": "storage",
+      "type": "database",
+      "label": "localStorage",
+      "sublabel": "浏览器本地 · 进度/记录/设置",
+      "pos": [
+        642,
+        500
+      ],
+      "size": [
+        220,
+        60
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "六款游戏模块 · 纯前端零构建",
+      "wraps": [
+        "cardspire",
+        "roguearena",
+        "pixeladv",
+        "token",
+        "dragpuzzle",
+        "puzzle"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "visitor-to-pages",
+      "from": "visitor",
+      "to": "pages",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pages-to-hub",
+      "from": "pages",
+      "to": "hub",
+      "label": "静态发布"
+    },
+    {
+      "id": "hub-to-cardspire",
+      "from": "hub",
+      "to": "cardspire",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "hub-to-roguearena",
+      "from": "hub",
+      "to": "roguearena",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "hub-to-pixeladv",
+      "from": "hub",
+      "to": "pixeladv",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "hub-to-token",
+      "from": "hub",
+      "to": "token",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "hub-to-dragpuzzle",
+      "from": "hub",
+      "to": "dragpuzzle",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "hub-to-puzzle",
+      "from": "hub",
+      "to": "puzzle",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "cardspire-to-storage",
+      "from": "cardspire",
+      "to": "storage",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "roguearena-to-storage",
+      "from": "roguearena",
+      "to": "storage",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "token-to-storage",
+      "from": "token",
+      "to": "storage",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "dragpuzzle-to-storage",
+      "from": "dragpuzzle",
+      "to": "storage",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "puzzle-to-storage",
+      "from": "puzzle",
+      "to": "storage",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "托管与部署",
+      "items": [
+        "GitHub Pages 从 main 分支自动发布",
+        "纯 HTML/CSS/JS，零构建、无后端"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "游戏矩阵",
+      "items": [
+        "大厅 index.html 统一导航六款游戏",
+        "每款游戏独立目录，互不依赖"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "本地数据",
+      "items": [
+        "五款游戏把进度/记录写入 localStorage",
+        "像素大冒险为纯会话体验，不落盘"
+      ]
+    }
+  ]
+}

@@ -16,10 +16,15 @@ practiceProject/
 │   ├── index.html           # 骨架与脚本引入
 │   ├── css/style.css        # 全部样式
 │   └── js/                  # utils/art/effects/cards/relics/enemies/events/sfx/engine/ui/main
-└── token-usage-tracker/     # 📊 AI 工具 Token 用量统计
-    ├── index.html           # 工具主页面
-    └── scan-cli.mjs         # 命令行扫描脚本（Node.js）
+├── token-usage-tracker/     # 📊 AI 工具 Token 用量统计
+│   ├── index.html           # 工具主页面
+│   └── scan-cli.mjs         # 命令行扫描脚本（Node.js）
+└── docs/                    # 📐 项目文档
+    ├── architecture.json    # 结构图源规范（archify 格式）
+    └── architecture.html    # 交互式项目结构图
 ```
+
+📐 **[项目结构图](docs/architecture.html)** —— 交互式架构图，支持明暗主题、引导视图与 PNG 导出（在线访问：[docs/architecture.html](docs/architecture.html)）。
 
 ## 🚀 快速开始
 
