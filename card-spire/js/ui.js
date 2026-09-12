@@ -12,15 +12,14 @@ function closeModal() { $('#modal').classList.remove('on'); }
 
 const RAR_STARS = { common: 1, uncommon: 2, rare: 3 };
 function cardHTML(c, cls = '', clickable = false, extra = '') {
-  const typeIcon = c.type === 'attack' ? '⚔️' : c.type === 'skill' ? '🛡️' : '✦';
   const stars = RAR_STARS[c.rarity] + (c.upgraded ? 1 : 0);
   const starTitle = '稀有度：' + (RARITY_NAME[c.rarity] || '') + (c.upgraded ? '（已升级）' : '');
-  return `<div class="hcard r-${c.rarity} ${cls} ${clickable ? 'clickable' : ''}" ${extra}>
+  return `<div class="hcard t-${c.type} r-${c.rarity} ${cls} ${clickable ? 'clickable' : ''}" ${extra}>
     <div class="c-cost">${c.cost}</div>
-    <div class="c-stars ${c.upgraded ? 'up' : ''}" title="${starTitle}">${'★'.repeat(stars)}</div>
-    <div class="c-name">${esc(c.name)}</div>
-    <div class="c-type">${typeIcon} ${TYPE_NAME[c.type]}</div>
+    <div class="c-plate"><span class="c-name ${c.upgraded ? 'up' : ''}">${esc(c.name)}</span></div>
+    <div class="c-art">${cardArt(c)}</div>
     <div class="c-desc">${c.desc}</div>
+    <div class="c-foot"><span class="c-type">${TYPE_NAME[c.type]}</span><span class="c-gem" title="${starTitle}"></span><span class="c-stars ${c.upgraded ? 'up' : ''}">${'★'.repeat(stars)}</span></div>
     ${c.exhaust ? '<div class="c-exh">消耗</div>' : ''}
   </div>`;
 }
@@ -33,18 +32,20 @@ function buffChips(buffs) {
 function intentHTML(e) {
   const it = e.def.intents[e.ii % e.def.intents.length];
   const name = BUFFS[it.buff] ? BUFFS[it.buff].name : '';
+  let body;
   switch (it.t) {
     case 'attack': {
       const d = calcAttackDamage(e, G.b.p, it.v);
-      return `⚔️ ${d}${(it.times || 1) > 1 ? '×' + it.times : ''}`;
+      body = `⚔️ ${d}${(it.times || 1) > 1 ? '×' + it.times : ''}`; break;
     }
-    case 'block': return `🛡️ ${it.v}`;
-    case 'buff': return `⬆️ ${name}`;
-    case 'debuff': return `⬇️ ${name}`;
-    case 'heal': return `💗 ${it.v}`;
-    case 'wait': return '⏳ 蓄力';
+    case 'block': body = `🛡️ ${it.v}`; break;
+    case 'buff': body = `⬆️ ${name}`; break;
+    case 'debuff': body = `⬇️ ${name}`; break;
+    case 'heal': body = `💗 ${it.v}`; break;
+    case 'wait': body = '⏳ 蓄力'; break;
+    default: body = '❓';
   }
-  return '❓';
+  return `<div class="intent i-${it.t}">${body}</div>`;
 }
 
 function renderTopbar() {
@@ -53,7 +54,7 @@ function renderTopbar() {
   tb.classList.add('on');
   const floor = G.row < 0 ? 1 : G.row + 2;
   tb.innerHTML = `
-    <div class="tb-hp">❤️<div class="hpbar"><i style="width:${(G.hp / G.maxHp * 100).toFixed(1)}%"></i></div><span>${G.hp}/${G.maxHp}</span></div>
+    <div class="tb-hp">❤️<div class="hpbar ${G.hp / G.maxHp < 0.3 ? 'low' : ''}"><i style="width:${(G.hp / G.maxHp * 100).toFixed(1)}%"></i></div><span>${G.hp}/${G.maxHp}</span></div>
     <span class="tb-item">💰<b>${G.gold}</b></span>
     <span class="tb-item hide-m">${esc(ACT_NAME[G.act])}</span>
     <span class="tb-item">第 ${floor}/9 层</span>
@@ -73,7 +74,7 @@ function renderMap() {
       const isCur = r === G.row && i === G.pos;
       const isAvail = !isDone && !isCur && (G.row < 0 ? r === 0 : r === G.row + 1) && avail.has(String(i));
       const st = isCur ? 'cur' : isDone ? 'done' : isAvail ? 'avail' : 'locked';
-      return `<button class="mnode ${st}" data-key="${r},${i}" ${isAvail ? `onclick="UI.node(${r},${i})"` : 'disabled'}>${NODE_ICON[n.t]}<span class="mlabel">${NODE_NAME[n.t]}</span></button>`;
+      return `<button class="mnode nt-${n.t} ${st}" data-key="${r},${i}" ${isAvail ? `onclick="UI.node(${r},${i})"` : 'disabled'}>${NODE_ICON[n.t]}<span class="mlabel">${NODE_NAME[n.t]}</span></button>`;
     }).join('');
     rows += `<div class="mrow">${items}</div>`;
   });
@@ -111,17 +112,24 @@ function renderBattle() {
   const b = G.b;
   const enemies = b.enemies.map(e => {
     const targetable = b.sel != null && e.hp > 0;
-    return `<div class="enemy ${e.hp <= 0 ? 'dead' : ''} ${targetable ? 't' : ''}" id="en-${e.slot}" ${targetable ? `onclick="UI.hitEnemy(${e.slot})"` : ''}>
-      ${e.hp > 0 ? `<div class="intent">${intentHTML(e)}</div>` : ''}
+    return `<div class="enemy ${e.hp <= 0 ? 'dead' : ''} ${targetable ? 't' : ''}" id="en-${e.slot}" style="--bob:${(-(e.slot * 0.9)).toFixed(1)}s" ${targetable ? `onclick="UI.hitEnemy(${e.slot})"` : ''}>
+      ${e.hp > 0 ? intentHTML(e) : ''}
       ${creatureSVG(e.def.art)}
-      <div class="ehp"><div class="hpbar"><i style="width:${(e.hp / e.maxHp * 100).toFixed(1)}%"></i></div><span>${e.hp}/${e.maxHp}</span>${e.block > 0 ? `<span class="blkchip">🛡${e.block}</span>` : ''}</div>
+      <div class="ehp"><div class="hpbar ${e.hp / e.maxHp < 0.3 ? 'low' : ''}"><i style="width:${(e.hp / e.maxHp * 100).toFixed(1)}%"></i></div><span>${e.hp}/${e.maxHp}</span>${e.block > 0 ? `<span class="blkchip">🛡${e.block}</span>` : ''}</div>
       <div class="ebuffs">${buffChips(e.buffs)}</div>
     </div>`;
   }).join('');
+  // 刚抽到的牌带入场动画（drawCards 记录 freshCount，渲染后清零）
+  const fresh = Math.min(b.freshCount || 0, b.hand.length);
+  b.freshCount = 0;
   const hand = b.hand.map((uid, i) => {
     const c = b.cardByUid[uid];
     const dis = c.cost > b.energy ? 'dis' : '';
-    return cardHTML(c, `handcard ${dis} ${b.sel === i ? 'selected' : ''}`, true, `data-hand="${i}" onclick="UI.cardClick(${i})"`);
+    const freshIdx = i - (b.hand.length - fresh);
+    const dealCls = freshIdx >= 0 ? 'deal' : '';
+    const delay = freshIdx >= 0 ? `animation-delay:${freshIdx * 55}ms;` : '';
+    return cardHTML(c, `handcard ${dealCls} ${dis} ${b.sel === i ? 'selected' : ''}`, true,
+      `data-hand="${i}" style="${delay}" onclick="UI.cardClick(${i})"`);
   }).join('');
   const hint = b.sel != null ? `<span style="color:var(--gold)">👆 点击一名敌人出牌（再点卡牌取消）</span>` : `<span class="hint-pc">桌面端：<span class="kbd">1-9</span> 出牌 · <span class="kbd">E</span> 结束回合 · <span class="kbd">D</span> 牌组</span><span class="hint-m">👆 点卡牌出牌 · 带剑标的牌需再点一名敌人</span>`;
   $('#stage').innerHTML = `
@@ -132,7 +140,7 @@ function renderBattle() {
         <div class="pavatar">${HERO_SVG}</div>
         <div class="pmeta">
           <div class="pname">冒险者</div>
-          <div class="hpbar"><i style="width:${(b.p.hp / b.p.maxHp * 100).toFixed(1)}%"></i></div>
+          <div class="hpbar ${b.p.hp / b.p.maxHp < 0.3 ? 'low' : ''}"><i style="width:${(b.p.hp / b.p.maxHp * 100).toFixed(1)}%"></i></div>
           <div class="pnum">❤️ ${b.p.hp}/${b.p.maxHp}　💰 ${G.gold}　🃏 抽牌堆 ${b.drawPile.length} / 弃牌 ${b.discardPile.length}${b.exhaustPile.length ? ' / 消耗 ' + b.exhaustPile.length : ''}</div>
         </div>
         <div class="pbuffs">${b.p.block > 0 ? `<span class="blkchip">🛡${b.p.block}</span>` : ''}${buffChips(b.p.buffs)}</div>

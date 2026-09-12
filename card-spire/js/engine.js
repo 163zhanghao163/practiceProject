@@ -103,6 +103,7 @@ function drawCards(n) {
       pushLog('弃牌堆已洗回抽牌堆');
     }
     b.hand.push(b.drawPile.pop());
+    b.freshCount = (b.freshCount || 0) + 1; // 供 renderBattle 播放抽牌入场动画
   }
 }
 function pushLog(msg) { if (G.b) { G.b.log.push(msg); if (G.b.log.length > 3) G.b.log.shift(); } }
@@ -166,6 +167,10 @@ async function animateFX() {
         host.classList.remove('flash');
         void host.offsetWidth;
         host.classList.add('flash');
+      }
+      if (f.cls === 'fdmg' && !G._testing && (parseInt(f.text, 10) || 0) >= 13) { // 重击震屏
+        const st = document.getElementById('stage');
+        if (st) { st.classList.remove('sshake'); void st.offsetWidth; st.classList.add('sshake'); }
       }
     }
     await sleep(140);

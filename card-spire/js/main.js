@@ -204,6 +204,12 @@ function runSelfTests() {
     while ((m = re.exec(src))) if (typeof UI[m[1]] !== 'function') missing.push(m[1]);
     assert(missing.length === 0, '缺少方法: ' + [...new Set(missing)].join(','));
   });
+  t('卡面贴图：全部卡牌均可匹配到主题图标', () => {
+    for (const c of CARDS) {
+      const art = cardArt(c);
+      assert(typeof art === 'string' && art.length > 0, `${c.id} 贴图缺失`);
+    }
+  });
   t('地图生成：三幕随机 60 次全图连通、无死路、必达首领', () => {
     for (let trial = 0; trial < 20; trial++) {
       for (const act of [1, 2, 3]) {
