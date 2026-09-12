@@ -248,3 +248,24 @@ button { font-family: inherit; cursor: pointer; }
   .mnode { width: 46px; height: 46px; font-size: 19px; }
   #topbar { font-size: 12px; gap: 6px; padding: 6px 8px; flex-wrap: wrap; }
 }
+
+/* 奖励界面内嵌升级选择：单屏一次结算 */
+.reward-up {
+  margin: 12px 0 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  background: rgba(232, 184, 75, 0.08);
+}
+.reward-up h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+.reward-up .up-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}

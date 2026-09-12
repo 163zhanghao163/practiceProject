@@ -204,7 +204,7 @@ function endBattle(win) {
   let relicName = null;
   if (isBoss || isElite) { relicName = grantRandomRelic(); }
   G.b = null;
-  G.pendingReward = { gold, xp, relicName, isBoss, isElite };
+  G.pendingReward = { gold, xp, relicName, isBoss, isElite, choices: pickCardChoices(3) };
   G.screen = 'reward';
   SFX.play('win');
   render();
@@ -397,7 +397,11 @@ function pickCardChoices(n) {
     const cCut = isBoss ? 0.45 : isElite ? 0.5 : 0.62;
     const uCut = isBoss ? 0.85 : isElite ? 0.88 : 0.92;
     if (roll >= uCut) rar = 'rare'; else if (roll >= cCut) rar = 'uncommon';
-    out.push(choice(CARDS.filter(c => c.rarity === rar)).id);
+    // 同一批奖励不出现重复卡牌（符合常规卡牌奖励规则）
+    let pool = CARDS.filter(c => c.rarity === rar && !out.includes(c.id));
+    if (!pool.length) pool = CARDS.filter(c => c.rarity === rar);
+    if (!pool.length) pool = CARDS;
+    out.push(choice(pool).id);
   }
   return out;
 }

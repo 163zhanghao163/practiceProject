@@ -191,6 +191,7 @@ function runSelfTests() {
     for (let i = 0; i < 100; i++) {
       const ids = pickCardChoices(3);
       assert(ids.length === 3 && ids.every(id => !!CARD_BY_ID[id]), `生成失败: ${ids}`);
+      assert(new Set(ids).size === 3, `同批奖励出现重复卡牌: ${ids}`);
     }
     G.pendingReward = null;
   });

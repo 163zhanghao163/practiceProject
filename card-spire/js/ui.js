@@ -151,17 +151,31 @@ function renderBattle() {
 }
 function renderReward() {
   const r = G.pendingReward;
-  const cards = pickCardChoices(3);
-  G.pendingReward.choices = cards;
+  if (!r) { $('#stage').innerHTML = ''; return; }
+  if (!r.choices) r.choices = pickCardChoices(3); // 旧档兼容；正常在战斗结算时已冻结
+  const lv = G.pendingLevels > 0;
+  if (lv && !G.levelChoices) rollLevelChoices();
+  // 升级强化直接内嵌在奖励界面：一次结算完毕即回地图，不再连环弹屏
+  const upSection = !lv ? '' : `
+        <div class="reward-up">
+          <h3>🎉 升级！选择一项永久强化<span style="float:right">剩余 ${G.pendingLevels} 次</span></h3>
+          <div class="up-btns">${(G.levelChoices || []).map((o, i) =>
+            `<button class="btn ghost" onclick="UI.pickUpgrade(${i})">${o.icon} <b>${esc(o.name)}</b>　${esc(o.desc)}</button>`).join('')}</div>
+        </div>`;
+  const cardArea = lv
+    ? `<p style="color:var(--dim);margin:10px 0 4px">完成上方升级选择后即可挑卡 ➜</p>`
+    : `
+        <p style="color:var(--dim);margin:10px 0 4px">选择一张卡牌加入你的牌组：</p>
+        <div class="reward-cards">${r.choices.map(id => cardHTML(CARD_BY_ID[id], 'mini clickable', true, `onclick="UI.takeCard('${id}')"`)).join('')}</div>
+        <button class="btn ghost skipbtn" onclick="UI.skipReward()">跳过 ✋</button>`;
   $('#stage').innerHTML = `
     <div class="panel-screen">
       <h2>⚔️ 战斗胜利！</h2>
       <div class="panel-box" style="text-align:center">
         <div class="gold-big">💰 获得 ${r.gold} 金币 · ✨ 获得 ${r.xp || 0} 经验</div>
         ${r.relicName ? `<div style="margin-top:8px"><span class="relic-tag">🟡 遗物：${esc(r.relicName)}</span></div>` : ''}
-        <p style="color:var(--dim);margin:10px 0 4px">选择一张卡牌加入你的牌组：</p>
-        <div class="reward-cards">${cards.map(id => cardHTML(CARD_BY_ID[id], 'mini clickable', true, `onclick="UI.takeCard('${id}')"`)).join('')}</div>
-        <button class="btn ghost skipbtn" onclick="UI.skipReward()">跳过 ✋</button>
+        ${upSection}
+        ${cardArea}
       </div>
     </div>`;
 }
@@ -404,8 +418,25 @@ const UI = {
       <div style="text-align:center;margin-top:14px"><button class="btn" onclick="UI.quitNow()">返回主菜单</button> <button class="btn ghost" onclick="UI.closeModal()">取消</button></div>`);
   },
   quitNow() { saveRun(); closeModal(); G.screen = 'title'; G.b = null; render(); },
-  takeCard(id) { SFX.play('coin'); G.deck.push(mkCard(id)); G.pendingReward = null; completeNode(); },
-  skipReward() { G.pendingReward = null; completeNode(); },
+  takeCard(id) {
+    if (G.pendingLevels > 0) { toast('请先完成升级选择！'); return; }
+    SFX.play('coin'); G.deck.push(mkCard(id)); G.pendingReward = null; completeNode();
+  },
+  skipReward() {
+    if (G.pendingLevels > 0) { toast('请先完成升级选择！'); return; }
+    G.pendingReward = null; completeNode();
+  },
+  pickUpgrade(i) {
+    const opt = (G.levelChoices || [])[i];
+    if (!opt || G.pendingLevels <= 0) return;
+    opt.apply();
+    G.pendingLevels--;
+    SFX.play('levelup');
+    toast(`${opt.icon} ${opt.name}！`);
+    if (G.pendingLevels > 0) rollLevelChoices(); else G.levelChoices = null;
+    saveRun();
+    render();
+  },
   buyCard(i) {
     const c = G.shopStock.cards[i];
     if (!c || c.sold || G.gold < c.price) return;
