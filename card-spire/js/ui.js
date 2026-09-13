@@ -19,7 +19,7 @@ function cardHTML(c, cls = '', clickable = false, extra = '') {
     <div class="c-plate"><span class="c-name ${c.upgraded ? 'up' : ''}">${esc(c.name)}</span></div>
     <div class="c-art">${cardArt(c)}</div>
     <div class="c-desc">${c.desc}</div>
-    <div class="c-foot"><span class="c-type">${TYPE_NAME[c.type]}</span><span class="c-gem" title="${starTitle}"></span><span class="c-stars ${c.upgraded ? 'up' : ''}">${'★'.repeat(stars)}</span></div>
+    <div class="c-foot"><span class="c-type">${TYPE_NAME[c.type]}</span>${c.cls && CHAR_BY[c.cls] ? `<span class="c-cls" title="${CHAR_BY[c.cls].name}专属">${CHAR_BY[c.cls].icon}</span>` : ''}<span class="c-gem" title="${starTitle}"></span><span class="c-stars ${c.upgraded ? 'up' : ''}">${'★'.repeat(stars)}</span></div>
     ${c.exhaust ? '<div class="c-exh">消耗</div>' : ''}
   </div>`;
 }
@@ -50,7 +50,7 @@ function intentHTML(e) {
 
 function renderTopbar() {
   const tb = $('#topbar');
-  if (['title', 'dead', 'win', 'selftest'].includes(G.screen)) { tb.classList.remove('on'); return; }
+  if (['title', 'select', 'dead', 'win', 'selftest'].includes(G.screen)) { tb.classList.remove('on'); return; }
   tb.classList.add('on');
   const floor = G.row < 0 ? 1 : G.row + 2;
   tb.innerHTML = `
@@ -110,6 +110,7 @@ function drawMapLines() {
 }
 function renderBattle() {
   const b = G.b;
+  const ch = charOf();
   const enemies = b.enemies.map(e => {
     const targetable = b.sel != null && e.hp > 0;
     return `<div class="enemy ${e.hp <= 0 ? 'dead' : ''} ${targetable ? 't' : ''}" id="en-${e.slot}" style="--bob:${(-(e.slot * 0.9)).toFixed(1)}s" ${targetable ? `onclick="UI.hitEnemy(${e.slot})"` : ''}>
@@ -139,7 +140,7 @@ function renderBattle() {
       <div class="bplayer" id="p-panel">
         <div class="pavatar">${HERO_SVG}</div>
         <div class="pmeta">
-          <div class="pname">冒险者</div>
+          <div class="pname">${ch.icon} 冒险者 · ${esc(ch.name)}</div>
           <div class="hpbar ${b.p.hp / b.p.maxHp < 0.3 ? 'low' : ''}"><i style="width:${(b.p.hp / b.p.maxHp * 100).toFixed(1)}%"></i></div>
           <div class="pnum">❤️ ${b.p.hp}/${b.p.maxHp}　💰 ${G.gold}　🃏 抽牌堆 ${b.drawPile.length} / 弃牌 ${b.discardPile.length}${b.exhaustPile.length ? ' / 消耗 ' + b.exhaustPile.length : ''}</div>
         </div>
@@ -279,11 +280,29 @@ function renderEnd(win) {
       <h2 style="font-size:34px">${win ? '🏆 通关！' : '💀 远征失败'}</h2>
       <div class="panel-box" style="text-align:center;max-width:460px">
         <p style="line-height:2">${win ? '你击败了塔主·湮灭者，尖塔的传说将由你书写！' : '尖塔吞噬了又一位挑战者……但传说不会终结。'}</p>
-        <p style="color:var(--dim);margin-top:8px">Lv.${G.level} · 抵达：${esc(ACT_NAME[G.act])} · 击杀：${G.kills} · 获得金币：${G.goldEarned}</p>
+        <p style="color:var(--dim);margin-top:8px">${charOf().icon} ${esc(charOf().name)} · Lv.${G.level} · 抵达：${esc(ACT_NAME[G.act])} · 击杀：${G.kills} · 获得金币：${G.goldEarned}</p>
         <p style="color:var(--dim)">遗物收集：${G.relics.length} 件 · 卡组规模：${G.deck.length} 张</p>
         <p style="color:var(--dim)">总场次 ${rec.runs} · 通关 ${rec.wins} 次</p>
         <button class="btn" style="margin-top:14px" onclick="UI.toTitle()">返回主菜单</button>
       </div>
+    </div>`;
+}
+function renderSelect() {
+  $('#stage').innerHTML = `
+    <div class="panel-screen">
+      <h2>🧬 选择你的种族</h2>
+      <p style="color:var(--dim)">种族决定初始生命、牌组与升级专精方向；职业专属卡只对相应种族开放。</p>
+      <div class="chargrid">${Object.values(CHARS).map(ch => {
+        const perkNames = ch.perks.slice(0, 4).map(p => { const o = LEVEL_UPS.find(x => x.id === p); return o ? o.name : ''; }).filter(Boolean);
+        const cnt = ch.deck.reduce((s, d) => s + d[1], 0);
+        return `<button class="charcard" onclick="UI.newRun('${ch.id}')">
+          <svg viewBox="0 0 100 100" class="char-svg" aria-hidden="true">${ART[ch.art.shape](ch.art)}</svg>
+          <div class="char-name">${ch.icon} ${esc(ch.name)}</div>
+          <div class="char-tag">${esc(ch.tagline)}</div>
+          <div class="char-stats">❤️ ${ch.hp}　⚡ 3 能量　🃏 ${cnt} 张</div>
+          <div class="char-perks" title="${esc(perkNames.join(' / '))}">专精：${esc(perkNames.join(' · '))}</div>
+        </button>`;
+      }).join('')}</div>
     </div>`;
 }
 function renderTitle() {
@@ -305,8 +324,8 @@ function renderTitle() {
       <div class="sub">SPIRE BUILDER · ROGUELIKE DECKBUILDER</div>
       <div class="title-menu">
         ${hasSave ? `<button class="btn" onclick="UI.continueRun()">▶ 继续冒险</button>
-        <div class="title-progress">第 ${prog.act} 幕 · ❤️ ${prog.hp}/${prog.maxHp} · 💰 ${prog.gold} · 🃏 ${prog.deck.length} 张</div>` : ''}
-        <button class="btn ${hasSave ? 'ghost' : ''}" onclick="UI.newRun()">⚔️ 新的远征</button>
+        <div class="title-progress">${CHAR_BY[prog.cls] ? CHAR_BY[prog.cls].icon : '⚔️'} 第 ${prog.act} 幕 · ❤️ ${prog.hp}/${prog.maxHp} · 💰 ${prog.gold} · 🃏 ${prog.deck.length} 张</div>` : ''}
+        <button class="btn ${hasSave ? 'ghost' : ''}" onclick="UI.pickChar()">⚔️ 新的远征</button>
         <button class="btn ghost" onclick="UI.howto()">📖 玩法说明</button>
         <button class="btn ghost" onclick="UI.allCards()">🃏 卡牌图鉴</button>
       </div>
@@ -328,6 +347,7 @@ function render() {
   renderTopbar();
   switch (G.screen) {
     case 'title': renderTitle(); break;
+    case 'select': renderSelect(); break;
     case 'map': renderMap(); break;
     case 'battle': renderBattle(); break;
     case 'reward': renderReward(); break;
@@ -393,6 +413,7 @@ const UI = {
   howto() {
     openModal(`<h3>📖 玩法说明</h3>
       <div style="line-height:2;font-size:14px;color:#d8d0ee">
+        <p>🧬 开局可选四大种族：<b>人类战士</b>（均衡）/ <b>血族裔</b>（吸血）/ <b>虚空裔</b>（弃牌手牌）/ <b>石裔</b>（荆棘壁垒），初始数值、牌组与升级专精各不相同，专属卡只对相应种族开放。</p>
         <p>🃏 每回合抽 5 张牌、有 3 点能量，出牌消耗能量；能量不足的牌会自动置灰。</p>
         <p>🛡️ <b>格挡</b>抵挡伤害，回合开始清空；敌人头顶显示<b>意图</b>（攻击/防御/增益…）。</p>
         <p>👆 需要指定敌人的卡牌：先点卡牌、再点敌人；其余卡牌点击直接生效。</p>
@@ -404,14 +425,19 @@ const UI = {
       <div style="text-align:center"><button class="btn ghost mclose" onclick="UI.closeModal()">知道了</button></div>`);
   },
   closeModal,
-  newRun() {
+  pickChar() { G.screen = 'select'; render(); },
+  newRun(clsId) {
+    const ch = CHAR_BY[clsId] || CHAR_BY.warrior;
     const rec = loadRecords(); rec.runs++; saveRecords(rec);
-    Object.assign(G, { screen: 'map', act: 1, row: -1, pos: -1, hp: 80, maxHp: 80, gold: 99,
+    Object.assign(G, { cls: ch.id, screen: 'map', act: 1, row: -1, pos: -1,
+      hp: ch.hp, maxHp: ch.hp, gold: ch.gold,
       deck: [], relics: [], mapRows: genMap(1), removeCost: 75, kills: 0, goldEarned: 0,
       maxEnergy: 3, b: null, shopStock: null, curEvent: null, evResult: null, pendingReward: null,
-      level: 1, xp: 0, pendingLevels: 0, levelChoices: null, lvlEnergyTaken: false,
-      baseStrength: 0, baseDexterity: 0, baseBlock: 0 });
-    for (const id of ['strike', 'strike', 'strike', 'strike', 'strike', 'defend', 'defend', 'defend', 'defend', 'bash']) G.deck.push(mkCard(id));
+      level: 1, xp: 0, pendingLevels: 0, levelChoices: null, lvlEnergyTaken: false, lvlDrawTaken: false,
+      baseStrength: 0, baseDexterity: 0, baseBlock: ch.baseBlock || 0,
+      baseDraw: ch.baseDraw || 5, baseThorns: 0, restDone: false });
+    for (const [id, n] of ch.deck) for (let i = 0; i < n; i++) G.deck.push(mkCard(id));
+    toast(`${ch.icon} ${ch.name}踏上征途！`);
     saveRun(); render();
   },
   continueRun() {

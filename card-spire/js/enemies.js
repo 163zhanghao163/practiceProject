@@ -16,6 +16,9 @@ const ENEMIES = [
   { key: 'skel', name: '骷髅兵', hp: [34, 42], act: 1, art: { shape: 'skel', c1: '#cfc8b8' }, intents: [A(8), B(6), A(9)] },
   { key: 'bandit', name: '强盗', hp: [28, 34], act: 1, art: { shape: 'hum', weapon: 'sword', c1: '#7a5230', c2: '#5a3a20' }, intents: [A(7), BF('strength', 2), A(8)] },
   { key: 'bug', name: '甲虫群', hp: [22, 28], act: 1, art: { shape: 'bug', c1: '#b0b23e' }, intents: [A(3, 3)] },
+  { key: 'rat', name: '瘟疫鼠群', hp: [20, 26], act: 1, art: { shape: 'beast', c1: '#8a7a5a', e: '#c8ff8a' }, intents: [A(4, 2), DB('poison', 1), A(6)] },
+  { key: 'cultist', name: '狂信者', hp: [30, 36], act: 1, art: { shape: 'hum', weapon: 'staff', c1: '#5a3a6a', c2: '#c08aff' }, intents: [BF('strength', 2), A(6), A(8)] },
+  { key: 'web_spider', name: '织网蛛', hp: [26, 32], act: 1, art: { shape: 'bug', c1: '#6a4a8a', e: '#c8ff8a' }, intents: [DB('weak', 1), A(6), A(7)] },
   { key: 'gargoyle', name: '石像鬼', hp: [70, 78], act: 1, elite: true, art: { shape: 'demon', c1: '#9aa0b8', c2: '#7a8098', e: '#8ef0ff' }, intents: [A(12), B(10), DB('vulnerable', 2), A(10)] },
   { key: 'jailer', name: '典狱长', hp: [78, 86], act: 1, elite: true, art: { shape: 'hum', weapon: 'axe', helm: true, c1: '#5a6b85', c2: '#3e4c60' }, intents: [A(9, 2), DB('weak', 2), A(13), B(8)] },
   { key: 'slime_king', name: '史莱姆大王', hp: [150, 160], act: 1, boss: true, art: { shape: 'blob', c1: '#3fae5f', c2: '#9fe8b0', crown: true }, intents: [A(11), B(14), A(7, 2), BF('strength', 3), A(16)] },
@@ -27,6 +30,9 @@ const ENEMIES = [
   { key: 'golem', name: '岩石魔像', hp: [68, 78], act: 2, art: { shape: 'golem', c1: '#7d7a72', c2: '#00000055', e: '#ffb347' }, intents: [W(), A(16), B(10)] },
   { key: 'hound', name: '暗影猎犬', hp: [40, 48], act: 2, art: { shape: 'beast', c1: '#3a3450', e: '#ff5a4d' }, intents: [A(9), BF('strength', 2), A(10)] },
   { key: 'priest', name: '血祭祭司', hp: [52, 62], act: 2, art: { shape: 'hum', weapon: 'staff', c1: '#8a3a4a', c2: '#ff8a9a' }, intents: [A(10), EH(8), DB('vulnerable', 1)] },
+  { key: 'crossbow', name: '城塞弩手', hp: [44, 50], act: 2, art: { shape: 'hum', weapon: 'sword', c1: '#4a5a3a', c2: '#2e3a24' }, intents: [A(7, 2), B(6), A(9)] },
+  { key: 'frost_elem', name: '霜寒之灵', hp: [52, 60], act: 2, art: { shape: 'ghost', c1: '#4a8ad0', e: '#d0f0ff' }, intents: [A(10), DB('weak', 2), A(11)] },
+  { key: 'ghoul', name: '食尸鬼', hp: [58, 66], act: 2, art: { shape: 'skel', c1: '#7a8a6a' }, intents: [A(12), EH(6), A(13)] },
   { key: 'executioner', name: '处刑者', hp: [98, 108], act: 2, elite: true, art: { shape: 'hum', weapon: 'axe', helm: true, c1: '#6a2a2a', c2: '#4a1a1a' }, intents: [A(17), BF('strength', 3), A(20)] },
   { key: 'war_golem', name: '战争傀儡', hp: [105, 118], act: 2, elite: true, art: { shape: 'golem', c1: '#5a6a7a', c2: '#00000055', e: '#8ef0ff' }, intents: [A(11, 2), B(14), A(18)] },
   { key: 'ancient_guardian', name: '远古守卫', hp: [220, 235], act: 2, boss: true, art: { shape: 'golem', c1: '#8a7a3a', c2: '#00000055', e: '#ffd34d' }, intents: [A(15), B(18), A(9, 2), DB('weak', 2), A(22)] },
@@ -36,6 +42,8 @@ const ENEMIES = [
   { key: 'dragonkin', name: '龙裔卫士', hp: [92, 102], act: 3, art: { shape: 'dragon', c1: '#3a7a5a', c2: '#2a5a42' }, intents: [A(17), B(14), A(19)] },
   { key: 'void_walker', name: '虚空行者', hp: [62, 72], act: 3, art: { shape: 'ghost', c1: '#5a4a9a', e: '#8ef0ff' }, intents: [A(9, 2), BF('strength', 3), DB('weak', 2)] },
   { key: 'chimera', name: '奇美拉', hp: [98, 110], act: 3, art: { shape: 'beast', c1: '#9a6a2a', e: '#ffd34d' }, intents: [A(12), DB('poison', 3), A(18)] },
+  { key: 'storm_djinn', name: '风暴之灵', hp: [74, 84], act: 3, art: { shape: 'ghost', c1: '#3a6ac0', e: '#ffe08a' }, intents: [A(8, 2), A(16), DB('vulnerable', 2)] },
+  { key: 'bone_colossus', name: '白骨巨像', hp: [110, 124], act: 3, art: { shape: 'golem', c1: '#cfc8b8', c2: '#8a8478', e: '#8ef0ff' }, intents: [B(16), A(20), A(10, 2)] },
   { key: 'fallen_knight', name: '堕落骑士', hp: [128, 140], act: 3, elite: true, art: { shape: 'hum', weapon: 'sword', helm: true, shield: true, c1: '#2a1a3a', c2: '#1a1028' }, intents: [A(15, 2), B(18), A(24)] },
   { key: 'chaos_avatar', name: '混沌化身', hp: [132, 148], act: 3, elite: true, art: { shape: 'demon', c1: '#6a2a8a', c2: '#4a1a62', wings: true, e: '#8ef0ff' }, intents: [A(18), BF('strength', 4), DB('vulnerable', 3), A(13, 2)] },
   { key: 'annihilator', name: '塔主 · 湮灭者', hp: [320, 345], act: 3, boss: true, art: { shape: 'demon', c1: '#3a1a4a', c2: '#250f30', wings: true, crown: true, e: '#ff5a4d' }, intents: [W(), A(32), A(11, 2), DB('vulnerable', 3), BF('strength', 4), A(20)] },
@@ -44,11 +52,14 @@ const ENEMY_BY = {};
 for (const e of ENEMIES) ENEMY_BY[e.key] = e;
 
 const ENCOUNTERS = {
-  1: { mobs: [['slime_s'], ['slime_s', 'slime_s'], ['slime_m'], ['bat', 'bat'], ['shroom'], ['skel'], ['bandit', 'bandit'], ['bug'], ['slime_m', 'bat']],
+  1: { mobs: [['slime_s'], ['slime_s', 'slime_s'], ['slime_m'], ['bat', 'bat'], ['shroom'], ['skel'], ['bandit', 'bandit'], ['bug'], ['slime_m', 'bat'],
+              ['rat'], ['cultist'], ['web_spider'], ['rat', 'bug'], ['cultist', 'bandit'], ['web_spider', 'bat']],
        elites: [['gargoyle'], ['jailer']], boss: ['slime_king'] },
-  2: { mobs: [['knight'], ['apprentice', 'apprentice'], ['mage'], ['assassin', 'assassin'], ['golem'], ['hound', 'hound'], ['knight', 'apprentice'], ['priest']],
+  2: { mobs: [['knight'], ['apprentice', 'apprentice'], ['mage'], ['assassin', 'assassin'], ['golem'], ['hound', 'hound'], ['knight', 'apprentice'], ['priest'],
+              ['crossbow'], ['frost_elem'], ['ghoul'], ['crossbow', 'hound'], ['frost_elem', 'crossbow'], ['ghoul', 'apprentice']],
        elites: [['executioner'], ['war_golem']], boss: ['ancient_guardian'] },
-  3: { mobs: [['abyss_mage'], ['blood_fiend'], ['dragonkin'], ['void_walker', 'void_walker'], ['chimera'], ['abyss_mage', 'void_walker']],
+  3: { mobs: [['abyss_mage'], ['blood_fiend'], ['dragonkin'], ['void_walker', 'void_walker'], ['chimera'], ['abyss_mage', 'void_walker'],
+              ['storm_djinn'], ['bone_colossus'], ['storm_djinn', 'void_walker'], ['bone_colossus', 'abyss_mage']],
        elites: [['fallen_knight'], ['chaos_avatar']], boss: ['annihilator'] },
 };
 const ACT_NAME = { 1: '第一幕 · 苔痕洞窟', 2: '第二幕 · 沉默城塞', 3: '第三幕 · 湮灭之巅' };

@@ -132,18 +132,51 @@ C('fortress_wall', '城墙', 2, 'skill', 'rare', 'self', [BLK(20), SBF('dexterit
 C('twin_moon', '双月斩', 1, 'attack', 'rare', 'enemy', [MUL(2, DMG(11))]);
 C('glass_cannon', '玻璃大炮', 2, 'attack', 'rare', 'enemy', [DMG(26), HPC(4)], { up: { vals: [4, 0] } });
 
+/* --- 种族专属卡（cls 标记；卡牌奖励/商店/事件只会出现中立牌 + 本种族牌） --- */
+/* 人类战士：正面攻防 */
+C('shield_charge', '盾锋冲击', 2, 'attack', 'common', 'enemy', [DMG(8), BLK(8)], { cls: 'warrior' });
+C('second_effort', '再战', 0, 'skill', 'common', 'self', [BLK(4), DRW(1)], { exhaust: true, cls: 'warrior' });
+C('sweeping_spear', '横扫长矛', 1, 'attack', 'common', 'all', [DMG(7)], { cls: 'warrior' });
+C('iron_body', '铁躯', 1, 'power', 'uncommon', 'self', [SBF('dexterity', 2)], { cls: 'warrior' });
+C('colossus_smash', '巨人粉碎', 2, 'attack', 'rare', 'enemy', [DMG(18), ABF('vulnerable', 2)], { cls: 'warrior' });
+C('last_stand', '背水一战', 1, 'skill', 'rare', 'self', [BLK(12), SBF('strength', 2)], { cls: 'warrior' });
+
+/* 血族裔：吸血续航 */
+C('thirst', '饥渴', 0, 'attack', 'common', 'enemy', [DMG(4), HEL(1)], { cls: 'vampire' });
+C('crimson_veil', '猩红面纱', 1, 'skill', 'common', 'self', [BLK(6), HEL(2)], { cls: 'vampire' });
+C('predator', '扑杀', 1, 'attack', 'uncommon', 'enemy', [DMG(9)], { lifesteal: true, cls: 'vampire' });
+C('exsanguinate', '放血', 2, 'attack', 'uncommon', 'enemy', [DMG(10), HPC(2)], { lifesteal: true, cls: 'vampire' });
+C('night_throne', '夜临加冕', 1, 'skill', 'uncommon', 'self', [HEL(4), ENR(1)], { exhaust: true, cls: 'vampire' });
+C('blood_moon', '血月降临', 2, 'power', 'rare', 'self', [SBF('strength', 1), SBF('vampiric', 1)], { cls: 'vampire' });
+
+/* 虚空裔：弃牌与手牌协同 */
+C('mind_spike', '心灵尖刺', 0, 'attack', 'common', 'enemy', [DMG({ ref: 'handCount', base: 1 })], { cls: 'voidborn' });
+C('void_armor', '虚空壁障', 1, 'skill', 'common', 'self', [BLK({ ref: 'handCount', base: 2 })], { cls: 'voidborn' });
+C('lucid', '清明', 0, 'skill', 'common', 'self', [DRW(1)], { exhaust: true, cls: 'voidborn' });
+C('tabula_rasa', '涤净心神', 1, 'skill', 'uncommon', 'self', [DIS(2), DRW(3)], { cls: 'voidborn' });
+C('starving_swarm', '噬群', 2, 'attack', 'uncommon', 'all', [DMG({ ref: 'handCount', base: 4 })], { cls: 'voidborn' });
+C('echo', '虚空回响', 1, 'skill', 'rare', 'self', [DIS(1), DRW(2), ENR(1)], { exhaust: true, cls: 'voidborn' });
+
+/* 石裔：荆棘壁垒 */
+C('moss_guard', '苔铠', 1, 'skill', 'common', 'self', [BLK(7)], { cls: 'stoneborn' });
+C('boulder_toss', '掷石', 1, 'attack', 'common', 'enemy', [DMG(6), BLK(3)], { cls: 'stoneborn' });
+C('deep_roots', '盘根错节', 0, 'skill', 'common', 'self', [BLK(3), SBF('thorns', 1)], { cls: 'stoneborn' });
+C('magma_heart', '熔岩之心', 1, 'power', 'uncommon', 'self', [SBF('thorns', 2), SBF('dexterity', 1)], { cls: 'stoneborn' });
+C('quake_step', '震地步', 2, 'attack', 'uncommon', 'all', [DMG(8), ABF('weak', 1)], { cls: 'stoneborn' });
+C('unyielding', '不屈之岩', 1, 'skill', 'rare', 'self', [BLK(8), HEL(6)], { cls: 'stoneborn' });
+
 /* 卡面贴图：按名称关键词匹配主题图标（零依赖的"贴图"方案），未命中回退到类型图标 */
 const CARD_ART = [
-  [/火|燃|炎|焚|焰/, '🔥'], [/毒|瘴|蚀/, '☠️'], [/血/, '🩸'], [/虚空|深渊|暗|湮/, '🌑'],
+  [/火|燃|炎|焚|焰|熔/, '🔥'], [/毒|瘴|蚀/, '☠️'], [/血/, '🩸'], [/虚空|深渊|暗|夜|湮/, '🌑'],
   [/雷|电|闪|谐|连锁/, '⚡'], [/冰|霜|寒/, '❄️'], [/荆棘|棘/, '🌵'], [/旋风|风暴|风/, '🌪️'],
   [/烟|雾/, '💨'], [/幻|影|鬼/, '👻'], [/恐|惧/, '😱'], [/月/, '🌙'], [/玻|炮/, '💥'],
-  [/处决|刽|斧/, '🪓'], [/天启|陨/, '☄️'], [/镜/, '🪞'],
-  [/医|急救|治疗|回复|愈/, '💚'], [/石/, '🪨'],
-  [/盾|壁|守|壑|肤|固|架势|城墙/, '🛡️'], [/药/, '🧪'],
+  [/处决|刽|斧/, '🪓'], [/天启|陨/, '☄️'], [/镜/, '🪞'], [/心灵|精神|意念/, '🧠'], [/根|藤|蔓|苔/, '🌿'],
+  [/医|急救|治疗|回复|愈/, '💚'], [/石|岩/, '🪨'],
+  [/盾|壁|守|壑|肤|固|躯|架势|城墙/, '🛡️'], [/药/, '🧪'],
   [/契约|仪式|印记|献祭/, '📜'],
   [/充能|能量|供能|超载|过载|储备|凝神|呼吸|韵律|预判|战术|冥想|共鸣|战略|极限|裂隙|时空/, '✨'],
   [/集结|号|吼/, '📣'], [/穿|贯/, '🗡️'],
-  [/斩|刃|剑|爪|击|打|拳|槌|刺|扫|挥|射|咬|剐|突/, '⚔️'],
+  [/斩|刃|剑|爪|击|打|拳|槌|刺|扫|挥|射|咬|剐|杀|突/, '⚔️'],
 ];
 function cardArt(c) {
   for (const [re, icon] of CARD_ART) if (re.test(c.name)) return icon;

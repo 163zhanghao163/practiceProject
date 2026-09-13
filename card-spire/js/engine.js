@@ -8,12 +8,52 @@ const G = {
   mapRows: null, removeCost: 75, kills: 0, goldEarned: 0,
   maxEnergy: 3, curEvent: null, shopStock: null, restDone: false,
   b: null,
-  // 成长系统
-  level: 1, xp: 0, pendingLevels: 0, levelChoices: null, lvlEnergyTaken: false,
+  // 种族与成长系统
+  cls: 'warrior', baseDraw: 5, baseThorns: 0,
+  level: 1, xp: 0, pendingLevels: 0, levelChoices: null, lvlEnergyTaken: false, lvlDrawTaken: false,
   baseStrength: 0, baseDexterity: 0, baseBlock: 0,
 };
 
-/* ---------------- 经验与等级成长 ---------------- */
+/* ---------------- 种族（开局选择，决定初始数值 / 牌组 / 专精方向） ---------------- */
+const CHARS = {
+  warrior: {
+    id: 'warrior', name: '人类战士', icon: '⚔️',
+    art: { shape: 'hum', weapon: 'sword', helm: true, shield: true, c1: '#a04838', c2: '#6a2e24' },
+    tagline: '均衡的正面作战专家，攻守兼备',
+    hp: 80, gold: 99,
+    perks: ['hp', 'str', 'dex', 'blk', 'gold', 'energy'],
+    deck: [['strike', 5], ['defend', 4], ['bash', 1]],
+  },
+  vampire: {
+    id: 'vampire', name: '血族裔', icon: '🩸',
+    art: { shape: 'demon', c1: '#8a2438', c2: '#5a1424', wings: true, e: '#ff8a9a' },
+    tagline: '以生命为食粮，越战越勇（血量偏低）',
+    hp: 70, gold: 99,
+    perks: ['str', 'dex', 'vamp', 'hp6', 'gold', 'energy'],
+    deck: [['strike', 4], ['defend', 3], ['vampiric_claw', 1], ['leeching_strike', 1], ['crimson_rite', 1]],
+  },
+  voidborn: {
+    id: 'voidborn', name: '虚空裔', icon: '🌑',
+    art: { shape: 'ghost', c1: '#4a3a8a', e: '#8ef0ff' },
+    tagline: '操纵弃牌与手牌的秘术师，每回合多抽 1 张',
+    hp: 64, gold: 99, baseDraw: 6,
+    perks: ['draw', 'energy', 'hp6', 'dex', 'gold'],
+    deck: [['strike', 4], ['defend', 2], ['void_touch', 2], ['abyss_gaze', 2]],
+  },
+  stoneborn: {
+    id: 'stoneborn', name: '石裔', icon: '🗿',
+    art: { shape: 'golem', c1: '#8a8a7a', c2: '#5a5a4e', e: '#9fe8b0' },
+    tagline: '坚不可摧的荆棘壁垒（初始 2 点格挡）',
+    hp: 92, gold: 99, baseBlock: 2,
+    perks: ['hp12', 'blk', 'thorns', 'dex', 'gold', 'energy'],
+    deck: [['strike', 4], ['defend', 5], ['thorn_shield', 1]],
+  },
+};
+const CHAR_BY = {};
+for (const c of Object.values(CHARS)) CHAR_BY[c.id] = c;
+function charOf() { return CHAR_BY[G.cls] || CHAR_BY.warrior; }
+
+/* ---------------- 经验与等级成长（专精池按种族过滤） ---------------- */
 function xpNeed(level) { return 30 + (level - 1) * 15; }
 function gainXp(n) {
   G.xp += n;
@@ -24,36 +64,46 @@ function gainXp(n) {
 }
 const LEVEL_UPS = [
   { id: 'hp',     icon: '❤️', name: '强健体魄', desc: '生命上限 +10，并回复 10 点生命', apply: () => { G.maxHp += 10; G.hp = Math.min(G.maxHp, G.hp + 10); } },
+  { id: 'hp6',    icon: '💗', name: '野蛮生长', desc: '生命上限 +6，并回复 6 点生命', apply: () => { G.maxHp += 6; G.hp = Math.min(G.maxHp, G.hp + 6); } },
+  { id: 'hp12',   icon: '🪨', name: '巨岩体魄', desc: '生命上限 +12，并回复 12 点生命', apply: () => { G.maxHp += 12; G.hp = Math.min(G.maxHp, G.hp + 12); } },
   { id: 'str',    icon: '⚔️', name: '磨砺锋刃', desc: '战斗开始时永久获得 1 层力量', apply: () => { G.baseStrength++; } },
   { id: 'dex',    icon: '🛡️', name: '加固护甲', desc: '战斗开始时永久获得 1 层敏捷', apply: () => { G.baseDexterity++; } },
   { id: 'blk',    icon: '🏰', name: '备战姿态', desc: '战斗开始时永久获得 3 点格挡', apply: () => { G.baseBlock += 3; } },
+  { id: 'thorns', icon: '🌵', name: '荆棘外壳', desc: '战斗开始时永久获得 2 层荆棘', apply: () => { G.baseThorns += 2; } },
+  { id: 'vamp',   icon: '🦇', name: '血之滋养', desc: '力量 +1，生命上限 +4 并回复 4 点', apply: () => { G.baseStrength++; G.maxHp += 4; G.hp = Math.min(G.maxHp, G.hp + 4); } },
+  { id: 'draw',   icon: '📜', name: '秘识扩充', desc: '每回合开始时多抽 1 张牌（每局仅一次）', can: () => !G.lvlDrawTaken, apply: () => { G.baseDraw++; G.lvlDrawTaken = true; } },
   { id: 'gold',   icon: '💰', name: '搜刮补给', desc: '立刻获得 80 金币', apply: () => { G.gold += 80; } },
   { id: 'energy', icon: '⚡', name: '核心扩张', desc: '能量上限 +1（每局仅一次）', can: () => !G.lvlEnergyTaken, apply: () => { G.maxEnergy++; G.lvlEnergyTaken = true; } },
 ];
 function rollLevelChoices() {
-  const pool = LEVEL_UPS.filter(o => !o.can || o.can());
+  const allowed = charOf().perks;
+  const pool = LEVEL_UPS.filter(o => allowed.includes(o.id) && (!o.can || o.can()));
   G.levelChoices = shuffle(pool.slice()).slice(0, 3);
 }
 
 /* ---------------- 存档 ---------------- */
 function saveRun() {
   if (!G.mapRows) return;
-  const s = { v: 1, act: G.act, row: G.row, pos: G.pos, hp: G.hp, maxHp: G.maxHp, gold: G.gold,
+  const s = { v: 2, cls: G.cls, act: G.act, row: G.row, pos: G.pos, hp: G.hp, maxHp: G.maxHp, gold: G.gold,
     deck: G.deck, relics: G.relics, mapRows: G.mapRows, removeCost: G.removeCost,
     kills: G.kills, goldEarned: G.goldEarned, maxEnergy: G.maxEnergy,
-    level: G.level, xp: G.xp, pendingLevels: G.pendingLevels, lvlEnergyTaken: G.lvlEnergyTaken,
-    baseStrength: G.baseStrength, baseDexterity: G.baseDexterity, baseBlock: G.baseBlock };
+    level: G.level, xp: G.xp, pendingLevels: G.pendingLevels, lvlEnergyTaken: G.lvlEnergyTaken, lvlDrawTaken: G.lvlDrawTaken,
+    baseStrength: G.baseStrength, baseDexterity: G.baseDexterity, baseBlock: G.baseBlock,
+    baseDraw: G.baseDraw, baseThorns: G.baseThorns };
   try { localStorage.setItem(LS_SAVE, JSON.stringify(s)); } catch (e) {}
 }
 function loadRun() {
   try {
     const s = JSON.parse(localStorage.getItem(LS_SAVE));
-    if (!s || s.v !== 1) return false;
-    Object.assign(G, { act: s.act, row: s.row, pos: s.pos, hp: s.hp, maxHp: s.maxHp, gold: s.gold,
+    if (!s || (s.v !== 1 && s.v !== 2)) return false;
+    Object.assign(G, { cls: CHAR_BY[s.cls] ? s.cls : 'warrior',
+      act: s.act, row: s.row, pos: s.pos, hp: s.hp, maxHp: s.maxHp, gold: s.gold,
       deck: s.deck, relics: s.relics, mapRows: s.mapRows, removeCost: s.removeCost,
       kills: s.kills, goldEarned: s.goldEarned, maxEnergy: s.maxEnergy, b: null,
-      level: s.level || 1, xp: s.xp || 0, pendingLevels: s.pendingLevels || 0, lvlEnergyTaken: !!s.lvlEnergyTaken,
-      baseStrength: s.baseStrength || 0, baseDexterity: s.baseDexterity || 0, baseBlock: s.baseBlock || 0 });
+      level: s.level || 1, xp: s.xp || 0, pendingLevels: s.pendingLevels || 0,
+      lvlEnergyTaken: !!s.lvlEnergyTaken, lvlDrawTaken: !!s.lvlDrawTaken,
+      baseStrength: s.baseStrength || 0, baseDexterity: s.baseDexterity || 0, baseBlock: s.baseBlock || 0,
+      baseDraw: s.baseDraw || 5, baseThorns: s.baseThorns || 0 });
     UID = Math.max(1000, ...G.deck.map(c => c.uid || 0)) + 1;
     return true;
   } catch (e) { return false; }
@@ -77,17 +127,17 @@ function startBattle(keys) {
   const drawPile = shuffle(G.deck.map(c => c.uid));
   G.b = {
     enemies, p: { hp: G.hp, maxHp: G.maxHp, block: G.baseBlock || 0, buffs: {
-      strength: G.baseStrength || 0, dexterity: G.baseDexterity || 0,
+      strength: G.baseStrength || 0, dexterity: G.baseDexterity || 0, thorns: G.baseThorns || 0,
     } },
     hand: [], drawPile, discardPile: [], exhaustPile: [],
     cardByUid: {}, energy: G.maxEnergy, maxEnergy: G.maxEnergy,
     turn: 0, sel: null, busy: false, over: false, phoenixUsed: false, atkCount: 0,
     log: ['遭遇了 ' + enemies.map(e => e.def.name).join('、') + '！'],
   };
-  for (const k of ['strength', 'dexterity']) if (!G.b.p.buffs[k]) delete G.b.p.buffs[k];
+  for (const k of ['strength', 'dexterity', 'thorns']) if (!G.b.p.buffs[k]) delete G.b.p.buffs[k];
   for (const c of G.deck) G.b.cardByUid[c.uid] = c;
   fireRelics('battleStart');
-  drawCards(5);
+  drawCards(G.baseDraw || 5);
   if (enemies.some(e => e.def.boss)) { toast('⚠️ 首领战：' + enemies[0].def.name); SFX.play('boss'); }
   else if (enemies.some(e => e.def.elite)) { toast('👹 精英遭遇战！'); SFX.play('select'); }
   G.screen = 'battle';
@@ -277,7 +327,7 @@ async function startPlayerTurn() {
   if (!b.p.buffs.barricade) b.p.block = 0;
   applyTurnEnergy(b);
   fireRelics('turnStart');
-  drawCards(5);
+  drawCards(G.baseDraw || 5);
   b.busy = false;
   render();
 }
@@ -392,6 +442,9 @@ function completeNode() {
 }
 
 /* ---------------- 奖励 / 商店 / 休息 / 事件辅助 ---------------- */
+function classPool(rar) { // 中立牌 + 本种族专属牌
+  return CARDS.filter(c => c.rarity === rar && (!c.cls || c.cls === G.cls));
+}
 function pickCardChoices(n) {
   const out = [];
   const isBoss = G.pendingReward && G.pendingReward.isBoss;
@@ -403,9 +456,9 @@ function pickCardChoices(n) {
     const uCut = isBoss ? 0.85 : isElite ? 0.88 : 0.92;
     if (roll >= uCut) rar = 'rare'; else if (roll >= cCut) rar = 'uncommon';
     // 同一批奖励不出现重复卡牌（符合常规卡牌奖励规则）
-    let pool = CARDS.filter(c => c.rarity === rar && !out.includes(c.id));
+    let pool = classPool(rar).filter(c => !out.includes(c.id));
+    if (!pool.length) pool = classPool(rar);
     if (!pool.length) pool = CARDS.filter(c => c.rarity === rar);
-    if (!pool.length) pool = CARDS;
     out.push(choice(pool).id);
   }
   return out;
@@ -430,7 +483,7 @@ function gainRelic(id) {
 }
 function healPlayer(n) { G.hp = Math.min(G.maxHp, G.hp + n); }
 function dmgPlayer(n) { G.hp = Math.max(1, G.hp - n); }
-function addRandomCard(rar) { const c = mkCard(choice(CARDS.filter(x => x.rarity === rar)).id); G.deck.push(c); return c.name; }
+function addRandomCard(rar) { const c = mkCard(choice(classPool(rar).length ? classPool(rar) : CARDS.filter(x => x.rarity === rar)).id); G.deck.push(c); return c.name; }
 function removeRandomCard() { if (!G.deck.length) return null; const c = G.deck.splice(rand(G.deck.length), 1)[0]; return c.name; }
 function upgradeRandomCard() {
   const pool = G.deck.filter(c => !c.upgraded);
@@ -446,7 +499,8 @@ function genShop() {
   for (let i = 0; i < 5; i++) {
     const roll = Math.random();
     const rar = roll < 0.55 ? 'common' : roll < 0.87 ? 'uncommon' : 'rare';
-    cards.push({ id: choice(CARDS.filter(c => c.rarity === rar)).id, sold: false });
+    const pool = classPool(rar);
+    cards.push({ id: choice(pool.length ? pool : CARDS.filter(c => c.rarity === rar)).id, sold: false });
   }
   const relicPool = shuffle(RELICS.filter(r => !G.relics.includes(r.id))).slice(0, 2);
   G.shopStock = {

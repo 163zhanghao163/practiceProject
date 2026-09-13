@@ -17,6 +17,7 @@ function validateData() {
     if (c.cost < 0 || c.cost > 3) errs.push(`${c.id} cost 越界: ${c.cost}`);
     if (!c.effects.length) errs.push(`${c.id} effects 为空`);
     if (!c.desc || /TODO|待补充|placeholder/i.test(c.desc)) errs.push(`${c.id} 描述缺失或为占位符`);
+    if (c.cls && !CHAR_BY[c.cls]) errs.push(`${c.id} 未知种族: ${c.cls}`);
     for (const e of expandEffects(c.effects)) {
       if (!OPERATORS[e.op]) errs.push(`${c.id} 未知算子: ${e.op}`);
       if (e.op === 'applyBuff' || e.op === 'selfBuff') if (!BUFFS[e.value.buff]) errs.push(`${c.id} 未知 buff: ${e.value.buff}`);
@@ -275,6 +276,73 @@ function runSelfTests() {
     G.b.energy = 3; clearFx();
     tryPlay(0, null);
     assert(G.b.p.buffs.strength === 2, `力量=${G.b.p.buffs.strength}`);
+  });
+  t('种族：初始牌组合法、数量合理', () => {
+    for (const ch of Object.values(CHARS)) {
+      for (const [id] of ch.deck) assert(CARD_BY_ID[id], `${ch.name} 初始牌 ${id} 不存在`);
+      const total = ch.deck.reduce((s, d) => s + d[1], 0);
+      assert(total >= 10 && total <= 12, `${ch.name} 初始牌组 ${total} 张越界`);
+    }
+  });
+  t('种族：卡牌奖励只出现中立牌或本族专属牌', () => {
+    G.pendingReward = { gold: 0, relicName: null, isBoss: false, isElite: false };
+    for (const clsId of Object.keys(CHARS)) {
+      G.cls = clsId;
+      for (let i = 0; i < 40; i++) {
+        for (const id of pickCardChoices(3)) {
+          const c = CARD_BY_ID[id];
+          assert(!c.cls || c.cls === clsId, `${clsId} 抽到他族专属卡 ${id}`);
+        }
+      }
+    }
+    G.cls = 'warrior'; G.pendingReward = null;
+  });
+  t('种族：升级专精只从本族池中选取', () => {
+    for (const clsId of Object.keys(CHARS)) {
+      G.cls = clsId;
+      for (let i = 0; i < 20; i++) {
+        rollLevelChoices();
+        assert(G.levelChoices.length === 3, `${clsId} 专精选项不足 3 项`);
+        for (const o of G.levelChoices) assert(CHARS[clsId].perks.includes(o.id), `${clsId} 出现非本族专精 ${o.id}`);
+      }
+    }
+    G.cls = 'warrior';
+  });
+  t('种族：虚空裔每回合多抽 1 张', () => {
+    G.cls = 'voidborn'; G.baseDraw = 6;
+    G.deck = Array(8).fill('defend').map(id => mkCard(id));
+    G.relics = []; G.maxEnergy = 3; G.hp = 64; G.maxHp = 64;
+    startBattle(['slime_s']);
+    assert(G.b.hand.length === 6, `虚空裔首回合手牌 ${G.b.hand.length} 张，应为 6`);
+    G.cls = 'warrior'; G.baseDraw = 5;
+  });
+  t('种族：石裔初始格挡与基础荆棘生效', () => {
+    G.cls = 'stoneborn'; G.baseThorns = 2; G.baseBlock = 2;
+    G.deck = Array(8).fill('defend').map(id => mkCard(id));
+    G.relics = []; G.maxEnergy = 3; G.hp = 92; G.maxHp = 92;
+    startBattle(['slime_s']);
+    assert(G.b.p.block === 2, `初始格挡 ${G.b.p.block}，应为 2`);
+    assert(G.b.p.buffs.thorns === 2, `基础荆棘 ${G.b.p.buffs.thorns}，应为 2`);
+    G.cls = 'warrior'; G.baseThorns = 0; G.baseBlock = 0;
+  });
+  t('存档：v2 往返保存种族与专精属性', () => {
+    G.mapRows = genMap(1);
+    G.cls = 'voidborn'; G.baseDraw = 7; G.baseThorns = 2; G.lvlDrawTaken = true;
+    saveRun();
+    G.cls = 'warrior'; G.baseDraw = 5; G.baseThorns = 0; G.lvlDrawTaken = false;
+    assert(loadRun() === true, 'v2 存档读取失败');
+    assert(G.cls === 'voidborn' && G.baseDraw === 7 && G.baseThorns === 2 && G.lvlDrawTaken === true, 'v2 往返字段不一致');
+  });
+  t('存档：v1 旧档可迁移，种族默认战士', () => {
+    const blob = JSON.stringify({ v: 1, act: 2, row: 3, pos: 1, hp: 55, maxHp: 80, gold: 120,
+      deck: [], relics: [], mapRows: genMap(2), removeCost: 75, kills: 3, goldEarned: 100,
+      maxEnergy: 3, level: 2, xp: 0, pendingLevels: 0, lvlEnergyTaken: false,
+      baseStrength: 1, baseDexterity: 0, baseBlock: 0 });
+    try { localStorage.setItem(LS_SAVE, blob); } catch (e) { return; }
+    assert(loadRun() === true, 'v1 存档读取失败');
+    assert(G.cls === 'warrior', `旧档种族应为 warrior，实际 ${G.cls}`);
+    assert(G.baseDraw === 5 && G.baseThorns === 0, '旧档专精属性应回退默认');
+    try { localStorage.removeItem(LS_SAVE); } catch (e) {}
   });
   G._testing = false;
   return T;

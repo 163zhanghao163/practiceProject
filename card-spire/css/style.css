@@ -422,6 +422,24 @@ button { font-family: inherit; cursor: pointer; }
   #topbar { font-size: 12px; gap: 6px; padding: 6px 8px; flex-wrap: wrap; }
 }
 
+/* ===== 种族选择 ===== */
+.chargrid { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; max-width: 940px; }
+.charcard {
+  width: 208px; padding: 14px 12px 12px; border-radius: 14px; text-align: center;
+  background: linear-gradient(180deg, rgba(46,36,78,.85), rgba(24,18,42,.92));
+  border: 2px solid var(--line); color: var(--text); font-family: inherit;
+  transition: transform .15s, border-color .15s, box-shadow .15s;
+  box-shadow: 0 8px 20px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.charcard:hover { transform: translateY(-6px); border-color: var(--gold); box-shadow: 0 12px 26px rgba(0,0,0,.5), 0 0 16px rgba(232,184,75,.35); }
+.charcard:active { transform: translateY(-2px) scale(.98); }
+.char-svg { width: 84px; height: 84px; filter: drop-shadow(0 5px 8px rgba(0,0,0,.5)); }
+.char-name { font-size: 17px; font-weight: 800; letter-spacing: 2px; margin-top: 4px; }
+.char-tag { color: var(--dim); font-size: 12px; line-height: 1.5; min-height: 36px; margin: 4px 0; }
+.char-stats { color: var(--gold); font-size: 13px; font-weight: 600; margin: 2px 0 6px; }
+.char-perks { color: var(--dim); font-size: 11px; line-height: 1.5; border-top: 1px dashed var(--line); padding-top: 6px; min-height: 40px; }
+.hcard .c-cls { color: var(--text); opacity: .9; }
+
 /* 奖励界面内嵌升级选择：单屏一次结算 */
 .reward-up {
   margin: 12px 0 6px;
